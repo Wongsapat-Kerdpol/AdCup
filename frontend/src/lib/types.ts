@@ -60,6 +60,19 @@ export interface CampaignDetail extends Campaign {
   is_funded: boolean;
 }
 
+// Person 3 — mock checkout (POST /api/payments/checkout/{id})
+export type PaymentMethod = "promptpay" | "card";
+
+export interface CheckoutResponse {
+  campaign_id: number;
+  campaign_status: CampaignStatus;
+  transaction_id: number;
+  reference: string;
+  amount: string;
+  method: PaymentMethod;
+  paid_at: string;
+}
+
 export interface Paginated<T> {
   items: T[];
   total: number;
