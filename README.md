@@ -1,0 +1,131 @@
+# AdCup
+
+Brands post campaigns with a fixed reward budget and a published rate per views. Creators post original
+videos, submit the link, and get paid (first-come-first-served, minus a flat 10% commission) once the
+brand approves. See `docs/proposal.md` for the full design.
+
+**Stack:** FastAPI · PostgreSQL · Next.js 15 (App Router) + shadcn/ui + Tailwind v4 · Docker Compose
+
+---
+
+## 1. Run it locally
+
+Requirements: **Docker Desktop** (Node.js/Python only needed if you want editor autocomplete).
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+| What | URL |
+|---|---|
+| Web app | http://localhost:3000 |
+| API docs (Swagger) | http://localhost:8000/docs |
+| PostgreSQL | `localhost:5432` user/pass/db from `.env` |
+
+Code hot-reloads in both containers. On first start the backend creates tables and seeds demo data.
+
+**Demo accounts** (password `password123`) — or use the one-click *Developer login* on `/login`:
+
+| Role | Email |
+|---|---|
+| Brand | `brand@adcup.dev`, `brand2@adcup.dev` |
+| Creator | `creator@adcup.dev` |
+| Admin | `admin@adcup.dev` |
+
+**Changed a model / columns?** Tables are created with `create_all` (no migrations), which never alters
+existing tables. Reset your local DB:
+
+```bash
+docker compose down -v && docker compose up --build
+```
+
+**Added an npm package?** `docker compose exec frontend npm install <pkg>` then
+`docker compose up --build frontend` for teammates. Python: add to `backend/requirements.txt` and rebuild.
+
+**Editor autocomplete** (optional): `cd frontend && npm install`, and `pip install -r backend/requirements.txt` in a venv.
+
+---
+
+## 2. Team split — who owns what
+
+| | Owner | Backend | Frontend |
+|---|---|---|---|
+| **Main** | Wongsapat | `core/*`, `models/*`, `routers/campaigns.py`, `routers/auth.py` (`/me`, `/dev-login`), `seed.py`, `main.py` | layout, header/footer, `/discover`, `CampaignCard`, `middleware.ts` (auth guard), `lib/*`, `components/ui/*` |
+| **Person 1** — Auth & Campaign Detail | | `routers/auth.py` (`/register`, `/login`), `routers/campaign_manage.py` | `/login`, `/register`, `/campaigns/[id]`, `/campaigns/new`, `/brand/campaigns` |
+| **Person 2** — Submission & Payout | | `routers/submissions.py`, `services/payout.py` | `/submissions`, `/brand/review`, submit-content form, status badge on `CampaignCard` |
+| **Person 3** — YouTube, Wallet, Payment | | `routers/youtube.py`, `routers/payments.py`, `routers/admin.py` | `/campaigns/[id]/fund`, `/wallet`, `/settings`, `/admin` |
+
+Every placeholder page/router has a `TODO(Person N)` comment listing what to build. Search for your tag:
+
+```bash
+git grep "Person 2"
+```
+
+### Shared things you should reuse (don't re-create them)
+
+**Backend**
+- `from app.core.deps import get_current_user, require_role` — auth guard
+  ```python
+  @router.post("")
+  def create(user: User = Depends(require_role(UserRole.brand)), db: Session = Depends(get_db)): ...
+  ```
+- `from app.core.security import hash_password, verify_password, create_access_token`
+- `from app.core.config import COMMISSION_RATE, MIN_WITHDRAWAL_THB`
+- `from app.services.payout import split_commission`
+- Models: `User`, `Campaign`, `Submission`, `Transaction` in `app/models/`. Money is `Decimal`, always **THB**.
+  Campaign rate is stored **per 1,000 views** (`rate_per_1k_views`); the UI shows it per 1M.
+
+**Frontend**
+- `api<T>(path, { method, body, query })` from `@/lib/api` — adds the JWT automatically, throws `ApiError`.
+- `useAuth()` from `@/components/providers/auth-provider` → `{ user, loading, login, logout, refresh }`.
+  After your login/register call succeeds: `login(tokenResponse)`.
+- `<RequireAuth roles={["brand"]}>` for page content; protected paths are listed in `src/lib/routes.ts`
+  (`protectedRoutes`) and enforced by `src/middleware.ts`.
+- `routes.*` from `@/lib/routes` — never hard-code paths. Add nav links in `navByRole`.
+- `<CampaignCard campaign={c} badge={...} footer={...} />` — `badge` (top-right) for submission status,
+  `footer` for buttons.
+- Toasts: `import { toast } from "sonner"; toast.success("Campaign created")`.
+- shadcn/ui components in `src/components/ui`. Add more with `npx shadcn@latest add <component>`.
+- Types in `@/lib/types` mirror the backend schemas — add yours there.
+
+---
+
+## 3. Git workflow
+
+```bash
+git checkout -b feature/p2-submissions   # one branch per feature
+# ... work, commit often ...
+git push -u origin feature/p2-submissions
+# open a Pull Request into main, ask one teammate to review
+```
+
+- Don't push directly to `main`.
+- Only edit files you own; if you need a change in a shared file (models, `lib/*`, `CampaignCard`),
+  keep it small and mention it in the PR so the others can pull it early.
+- Never commit `.env` or any password / Google secret.
+
+---
+
+## 4. Project structure
+
+```
+backend/app/
+  core/        config, database, security (JWT/bcrypt), deps (auth guard)
+  models/      User, Campaign, Submission, Transaction
+  schemas/     Pydantic request/response models
+  routers/     one file per feature area (see ownership table)
+  services/    business logic (payout engine)
+  seed.py      demo data
+frontend/src/
+  app/         Next.js pages (App Router)
+  components/  ui/ (shadcn), layout/, campaign/, discover/, auth/, providers/
+  lib/         api client, auth token, routes, types, utils
+  middleware.ts  route auth guard
+```
+
+## 5. Deploy (later)
+
+The university VM (Ubuntu 24.04, Docker preinstalled) can run the same `docker-compose.yml`.
+A production compose (built Next.js, no `--reload`, `DEV_LOGIN_ENABLED=false`) will be added before the demo.
+Keep VM credentials out of this repo.
