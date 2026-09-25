@@ -73,6 +73,41 @@ export interface CheckoutResponse {
   paid_at: string;
 }
 
+// Person 3 — wallet (GET /api/wallet, POST /api/wallet/withdraw)
+export type TransactionType = "campaign_fund" | "payout" | "withdrawal";
+export type TransactionStatus = "pending" | "completed" | "failed";
+
+export interface WalletTransaction {
+  id: number;
+  type: TransactionType;
+  status: TransactionStatus;
+  gross_amount: string;
+  commission_amount: string;
+  net_amount: string;
+  reference: string | null;
+  campaign_id: number | null;
+  campaign_title: string | null;
+  submission_id: number | null;
+  views_from: number | null;
+  views_to: number | null;
+  created_at: string;
+}
+
+export interface Wallet {
+  balance: string;
+  min_withdrawal: string;
+  can_withdraw: boolean;
+  total_earned: string;
+  total_commission: string;
+  total_withdrawn: string;
+  transactions: WalletTransaction[];
+}
+
+export interface WithdrawResponse {
+  balance: string;
+  transaction: WalletTransaction;
+}
+
 export interface Paginated<T> {
   items: T[];
   total: number;
