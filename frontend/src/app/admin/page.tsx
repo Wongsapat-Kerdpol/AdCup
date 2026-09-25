@@ -8,7 +8,13 @@ export default function AdminPage() {
       <ComingSoon
         owner="Person 3 — Admin"
         title="Analytics"
-        todo={["Active users", "Transaction volume", "Commission revenue (projected)", "Campaign performance"]}
+        todo={[
+          "Active users",
+          "Transaction volume",
+          "Commission revenue (projected)",
+          "Campaign performance",
+          "Submissions per status (link to the review queue)",
+        ]}
       />
     </RequireAuth>
   );

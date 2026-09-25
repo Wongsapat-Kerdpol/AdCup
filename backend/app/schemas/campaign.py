@@ -52,6 +52,7 @@ class CampaignDetail(CampaignCard):
     requirements: str
     cap_per_post: Decimal | None = None
     cap_per_profile: Decimal | None = None
+    min_views: int
     is_funded: bool
 
 

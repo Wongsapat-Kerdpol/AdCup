@@ -11,12 +11,12 @@ export const routes = {
   campaign: (id: number | string) => `/campaigns/${id}`, // Person 1
   newCampaign: "/campaigns/new", // Person 1
   fundCampaign: (id: number | string) => `/campaigns/${id}/fund`, // Person 3
-  brandCampaigns: "/brand/campaigns", // Person 1
-  brandReview: "/brand/review", // Person 2
+  brandCampaigns: "/brand/campaigns", // Person 1 (+ read-only submissions list from Person 2)
   submissions: "/submissions", // Person 2
   wallet: "/wallet", // Person 3
   settings: "/settings", // Person 3 (YouTube connect)
-  admin: "/admin", // Person 3
+  admin: "/admin", // Person 3 (analytics)
+  adminReview: "/admin/review", // Person 2 (round-2 review queue)
 } as const;
 
 /** Path prefixes that require login, and optionally a specific role. First match wins. */
@@ -45,10 +45,10 @@ export const navByRole: Record<UserRole | "guest", { href: string; label: string
   brand: [
     { href: routes.discover, label: "Discover" },
     { href: routes.brandCampaigns, label: "My Campaigns" },
-    { href: routes.brandReview, label: "Review" },
   ],
   admin: [
     { href: routes.discover, label: "Discover" },
+    { href: routes.adminReview, label: "Review Queue" },
     { href: routes.admin, label: "Analytics" },
   ],
 };

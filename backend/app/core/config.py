@@ -38,4 +38,6 @@ settings = get_settings()
 # --- Business rules from the proposal (section 6). Import these, don't hard-code. ---
 COMMISSION_RATE = Decimal("0.10")  # flat 10% platform commission on every payout
 MIN_WITHDRAWAL_THB = Decimal("1500.00")  # creator can withdraw once balance >= this
+DEFAULT_MIN_VIEWS = 1000  # round-1 system check: minimum views before admin review (per-campaign override)
+SUPPORTED_SUBMISSION_PLATFORMS = ("youtube",)  # add "tiktok", "instagram" once their APIs are integrated
 CURRENCY = "THB"

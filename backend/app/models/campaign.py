@@ -2,9 +2,10 @@ import enum
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ARRAY, Boolean, DateTime, Enum, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import ARRAY, Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.config import DEFAULT_MIN_VIEWS
 from app.core.database import Base
 from app.models.user import User
 
@@ -24,6 +25,7 @@ class CampaignStatus(str, enum.Enum):
 
 
 class Platform(str, enum.Enum):
+    # Only YouTube submissions are verified for now; TikTok/IG come later.
     youtube = "youtube"
     tiktok = "tiktok"
     instagram = "instagram"
@@ -52,7 +54,9 @@ class Campaign(Base):
     # Gross amount already paid out of the pool. Updated by the payout engine (Person 2).
     paid_out: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
     cap_per_post: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))  # max gross per submission
-    cap_per_profile: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))  # max gross per creator
+    cap_per_profile: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))  # max gross per creator (this campaign)
+    # Round-1 system check: a video needs at least this many views before it can go to admin review.
+    min_views: Mapped[int] = mapped_column(Integer, default=DEFAULT_MIN_VIEWS)
 
     status: Mapped[CampaignStatus] = mapped_column(
         Enum(CampaignStatus, native_enum=False, length=20), default=CampaignStatus.draft, index=True

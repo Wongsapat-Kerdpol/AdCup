@@ -1,8 +1,9 @@
 # AdCup
 
 Brands post campaigns with a fixed reward budget and a published rate per views. Creators post original
-videos, submit the link, and get paid (first-come-first-served, minus a flat 10% commission) once the
-brand approves. See `docs/proposal.md` for the full design.
+YouTube videos and submit the link. Each video goes through a **system check** and an **admin review**;
+once approved it **earns continuously as its views grow** (first-come-first-served from the campaign
+pool, minus a flat 10% commission). See `docs/proposal.md` for the full design.
 
 **Stack:** FastAPI · PostgreSQL · Next.js 15 (App Router) + shadcn/ui + Tailwind v4 · Docker Compose
 
@@ -53,8 +54,38 @@ docker compose down -v && docker compose up --build
 |---|---|---|---|
 | **Main** | Wongsapat | `core/*`, `models/*`, `routers/campaigns.py`, `routers/auth.py` (`/me`, `/dev-login`), `seed.py`, `main.py` | layout, header/footer, `/discover`, `CampaignCard`, `middleware.ts` (auth guard), `lib/*`, `components/ui/*` |
 | **Person 1** — Auth & Campaign Detail | | `routers/auth.py` (`/register`, `/login`), `routers/campaign_manage.py` | `/login`, `/register`, `/campaigns/[id]`, `/campaigns/new`, `/brand/campaigns` |
-| **Person 2** — Submission & Payout | | `routers/submissions.py`, `services/payout.py` | `/submissions`, `/brand/review`, submit-content form, status badge on `CampaignCard` |
-| **Person 3** — YouTube, Wallet, Payment | | `routers/youtube.py`, `routers/payments.py`, `routers/admin.py` | `/campaigns/[id]/fund`, `/wallet`, `/settings`, `/admin` |
+| **Person 2** — Submission, Review & Payout | | `routers/submissions.py`, `routers/review.py`, `services/verification.py`, `services/payout.py` | `/submissions`, `/admin/review`, `SubmitContentForm` |
+| **Person 3** — YouTube, Wallet, Payment | | `routers/youtube.py`, `services/youtube.py`, `routers/payments.py`, `routers/admin.py` | `/campaigns/[id]/fund`, `/wallet`, `/settings`, `/admin` |
+
+### Submission lifecycle (the core flow)
+
+```
+Creator submits YouTube link
+      │
+      ▼
+[pending] ── Round 1: SYSTEM check (Person 2, using Person 3's YouTube data) ──────────────┐
+      │   video exists & public · belongs to the creator's connected channel ·            │ fail
+      │   published after the campaign started · not a duplicate                         ▼
+      │   · views >= campaign.min_views (default 1,000) — waits here until reached   [rejected]
+      ▼                                                                          (rejected_by=system)
+[under_review] ── Round 2: ADMIN watches the video vs the brand's requirements ───┐
+      │            (e.g. "the water bottle must be visible")                      │ reject + reason
+      ▼ approve                                                                   ▼
+[approved] ── earns INCREMENTALLY on every views refresh                     [rejected]
+                                                                          (rejected_by=admin)
+```
+
+- **Brands never approve.** They create/fund campaigns and see submissions read-only.
+- **Payout increment** (`services/payout.py`): `new_views = view_count - paid_views` →
+  `gross = new_views / 1000 × rate`, limited by **cap per post**, **cap per profile** and the
+  **remaining pool** (FCFS by `approved_at`). 10% commission, net → creator wallet, one `Transaction` per increment.
+  Example at ฿1 / 1K views: approved at 1,000 views → +฿1; refreshed at 3,000 views → +฿2.
+- **Views refresh** (Person 3): a "Refresh views" button and/or a periodic job. Pending submissions are
+  re-checked (round 1); approved ones get paid for new views.
+- **Withdrawal**: the wallet grows continuously, cash-out only once balance ≥ ฿1,500.
+- **Platforms**: YouTube only for now (`SUPPORTED_SUBMISSION_PLATFORMS`); TikTok / IG later.
+- **Hand-off between Person 2 & 3**: `services/youtube.py` defines `VideoInfo` + `get_video_info()`.
+  Person 2 codes against it now (mock it while Person 3 builds it).
 
 Every placeholder page/router has a `TODO(Person N)` comment listing what to build. Search for your tag:
 
@@ -71,8 +102,9 @@ git grep "Person 2"
   def create(user: User = Depends(require_role(UserRole.brand)), db: Session = Depends(get_db)): ...
   ```
 - `from app.core.security import hash_password, verify_password, create_access_token`
-- `from app.core.config import COMMISSION_RATE, MIN_WITHDRAWAL_THB`
+- `from app.core.config import COMMISSION_RATE, MIN_WITHDRAWAL_THB, DEFAULT_MIN_VIEWS, SUPPORTED_SUBMISSION_PLATFORMS`
 - `from app.services.payout import split_commission`
+- `from app.services.youtube import extract_video_id, get_video_info, VideoInfo`
 - Models: `User`, `Campaign`, `Submission`, `Transaction` in `app/models/`. Money is `Decimal`, always **THB**.
   Campaign rate is stored **per 1,000 views** (`rate_per_1k_views`); the UI shows it per 1M.
 
@@ -85,6 +117,7 @@ git grep "Person 2"
 - `routes.*` from `@/lib/routes` — never hard-code paths. Add nav links in `navByRole`.
 - `<CampaignCard campaign={c} badge={...} footer={...} />` — `badge` (top-right) for submission status,
   `footer` for buttons.
+- `<SubmissionStatusBadge status="under_review" />` from `@/components/campaign/submission-status-badge`.
 - Toasts: `import { toast } from "sonner"; toast.success("Campaign created")`.
 - shadcn/ui components in `src/components/ui`. Add more with `npx shadcn@latest add <component>`.
 - Types in `@/lib/types` mirror the backend schemas — add yours there.

@@ -30,7 +30,8 @@ export type CampaignSort =
   | "most_available"
   | "ending_soon";
 
-export type SubmissionStatus = "pending" | "approved" | "rejected";
+// pending = system check (round 1) · under_review = admin check (round 2) · approved = earning
+export type SubmissionStatus = "pending" | "under_review" | "approved" | "rejected";
 
 export interface Campaign {
   id: number;
@@ -55,6 +56,7 @@ export interface CampaignDetail extends Campaign {
   requirements: string;
   cap_per_post: string | null;
   cap_per_profile: string | null;
+  min_views: number;
   is_funded: boolean;
 }
 

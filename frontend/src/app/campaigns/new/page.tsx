@@ -9,8 +9,10 @@ export default function NewCampaignPage() {
         owner="Person 1 — Brand"
         title="Create a campaign"
         todo={[
-          "Title, description, requirements, category (logo/music/clipping/ugc)",
-          "Allowed platforms, rate per 1K views (THB), total budget, cap per post / per profile, deadline",
+          "Title, description, category (logo/music/clipping/ugc)",
+          "Requirements — what the admin checks in the video (e.g. \"show the bottle\")",
+          "Rate per 1K views (THB), total budget, cap per post, cap per profile, min views (default 1,000), deadline",
+          "Platforms: YouTube only for now (TikTok / IG later)",
           "Validate on frontend + backend",
           "After create -> redirect to /campaigns/{id}/fund (Person 3 mock checkout)",
         ]}

@@ -64,12 +64,13 @@ def seed_if_empty() -> None:
                     title=title,
                     description=f"Create an original short-form video for “{title}”. "
                     "Post it on one of the allowed platforms and submit the link.",
-                    requirements="• Video must be original content\n"
-                    "• Minimum 10 seconds\n"
-                    "• Tag the brand in the caption\n"
+                    requirements="• Show the product clearly on screen for at least 3 seconds\n"
+                    "• Video must be original content, minimum 10 seconds\n"
+                    "• Mention the brand in the title or description\n"
                     "• No reposts or AI-generated voiceovers",
                     category=CampaignCategory(cat),
-                    platforms=platforms,
+                    # Submissions are YouTube-only for now, so every demo campaign accepts YouTube.
+                    platforms=["youtube"] + [p for p in platforms if p != "youtube"],
                     rate_per_1k_views=Decimal(str(rate)),
                     total_budget=budget_d,
                     paid_out=(budget_d * Decimal(str(frac))).quantize(Decimal("0.01")),

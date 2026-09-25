@@ -10,7 +10,8 @@ export default function BrandCampaignsPage() {
         title="My campaigns"
         todo={[
           "List own campaigns incl. drafts (not funded yet)",
-          "Per campaign: spend so far, creators joined, pending submissions, total views",
+          "Per campaign: spend so far, creators joined, submissions per status, total views",
+          "Read-only list of submitted videos (Person 2's API) — brands don't approve, admins do",
         ]}
       />
     </RequireAuth>

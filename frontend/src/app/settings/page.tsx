@@ -8,7 +8,11 @@ export default function SettingsPage() {
       <ComingSoon
         owner="Person 3 — YouTube OAuth"
         title="Settings"
-        todo={["Connect YouTube (Google OAuth) -> shows linked channel", "Disconnect channel"]}
+        todo={[
+          "Connect YouTube (Google OAuth) -> shows linked channel",
+          "Required before submitting: the system checks the video belongs to this channel",
+          "Disconnect channel",
+        ]}
       />
     </RequireAuth>
   );

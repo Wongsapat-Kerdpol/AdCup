@@ -9,7 +9,8 @@ export default function WalletPage() {
         owner="Person 3 — Wallet"
         title="Wallet"
         todo={[
-          "Balance + transaction history (gross / commission / net)",
+          "Balance grows every time views are refreshed on an approved video",
+          "Transaction history (gross / commission / net, views paid for)",
           "Mock Cash Out — enabled once balance ≥ ฿1,500",
         ]}
       />
