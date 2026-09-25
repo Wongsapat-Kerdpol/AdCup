@@ -1,21 +1,15 @@
-import { RequireAuth } from "@/components/auth/require-auth";
-import { ComingSoon } from "@/components/layout/coming-soon";
+import type { Metadata } from "next";
 
-// TODO(Person 3)
+import { AdminDashboard } from "@/components/admin/admin-dashboard";
+import { RequireAuth } from "@/components/auth/require-auth";
+
+export const metadata: Metadata = { title: "Analytics" };
+
+// [PERSON 3] Admin analytics dashboard.
 export default function AdminPage() {
   return (
     <RequireAuth roles={["admin"]}>
-      <ComingSoon
-        owner="Person 3 — Admin"
-        title="Analytics"
-        todo={[
-          "Active users",
-          "Transaction volume",
-          "Commission revenue (projected)",
-          "Campaign performance",
-          "Submissions per status (link to the review queue)",
-        ]}
-      />
+      <AdminDashboard />
     </RequireAuth>
   );
 }

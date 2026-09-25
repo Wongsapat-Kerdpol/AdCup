@@ -108,6 +108,40 @@ export interface WithdrawResponse {
   transaction: WalletTransaction;
 }
 
+// Person 3 — admin analytics (GET /api/admin/stats)
+export interface AdminStats {
+  users: {
+    total: number;
+    by_role: Record<UserRole, number>;
+    new_last_30d: number;
+    active_last_30d: number;
+  };
+  money: {
+    total_funded: string;
+    total_paid_out: string;
+    commission_revenue: string;
+    total_withdrawn: string;
+    locked_in_pools: string;
+    projected_commission: string;
+    transaction_count: number;
+  };
+  daily: { day: string; paid_out: string; commission: string; funded: string }[];
+  submissions_by_status: Record<SubmissionStatus, number>;
+  campaigns_by_status: Record<CampaignStatus, number>;
+  top_campaigns: {
+    id: number;
+    title: string;
+    brand_name: string;
+    status: CampaignStatus;
+    total_budget: string;
+    paid_out: string;
+    paid_out_percent: number;
+    submissions: number;
+    approved: number;
+    views: number;
+  }[];
+}
+
 export interface Paginated<T> {
   items: T[];
   total: number;
