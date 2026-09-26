@@ -60,6 +60,42 @@ export interface CampaignDetail extends Campaign {
   is_funded: boolean;
 }
 
+// Person 2 — submissions (POST /api/submissions, GET /api/submissions/mine,
+// GET /api/submissions/campaign/{id}, GET/POST /api/admin/review/*)
+export type RejectedBy = "system" | "admin";
+
+export interface Submission {
+  id: number;
+  campaign_id: number;
+  creator_id: number;
+  video_url: string;
+  platform: string;
+  external_video_id: string | null;
+  video_title: string | null;
+  video_channel_id: string | null;
+  video_published_at: string | null;
+  view_count: number;
+  views_refreshed_at: string | null;
+  status: SubmissionStatus;
+  system_checked_at: string | null;
+  reviewed_by_id: number | null;
+  reviewed_at: string | null;
+  approved_at: string | null;
+  rejected_by: RejectedBy | null;
+  rejection_reason: string | null;
+  gross_amount: string;
+  commission_amount: string;
+  net_amount: string;
+  paid_views: number;
+  created_at: string;
+}
+
+export interface SubmissionForReview extends Submission {
+  campaign_title: string;
+  campaign_requirements: string;
+  creator_name: string;
+}
+
 // Person 3 — mock checkout (POST /api/payments/checkout/{id})
 export type PaymentMethod = "promptpay" | "card";
 
