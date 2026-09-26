@@ -1,19 +1,16 @@
-import { RequireAuth } from "@/components/auth/require-auth";
-import { ComingSoon } from "@/components/layout/coming-soon";
+import type { Metadata } from "next";
 
-// TODO(Person 3): mock checkout. POST /api/payments/checkout/{id}
-export default function FundCampaignPage() {
+import { RequireAuth } from "@/components/auth/require-auth";
+import { FundCheckout } from "@/components/payment/fund-checkout";
+
+export const metadata: Metadata = { title: "Fund campaign" };
+
+// [PERSON 3] Mock checkout — the brand locks the campaign budget into the reward pool.
+export default async function FundCampaignPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   return (
     <RequireAuth roles={["brand"]}>
-      <ComingSoon
-        owner="Person 3 — Payment"
-        title="Fund campaign"
-        todo={[
-          "Order summary: total budget to lock into the pool",
-          "Mock payment (fake QR / Stripe test mode)",
-          "On success: campaign becomes active + Transaction(type=campaign_fund)",
-        ]}
-      />
+      <FundCheckout campaignId={id} />
     </RequireAuth>
   );
 }

@@ -1,19 +1,15 @@
-import { RequireAuth } from "@/components/auth/require-auth";
-import { ComingSoon } from "@/components/layout/coming-soon";
+import type { Metadata } from "next";
 
-// TODO(Person 3)
+import { RequireAuth } from "@/components/auth/require-auth";
+import { WalletView } from "@/components/wallet/wallet-view";
+
+export const metadata: Metadata = { title: "Wallet" };
+
+// [PERSON 3] Creator wallet: balance, lifetime totals, mock cash out, transaction history.
 export default function WalletPage() {
   return (
     <RequireAuth roles={["creator"]}>
-      <ComingSoon
-        owner="Person 3 — Wallet"
-        title="Wallet"
-        todo={[
-          "Balance grows every time views are refreshed on an approved video",
-          "Transaction history (gross / commission / net, views paid for)",
-          "Mock Cash Out — enabled once balance ≥ ฿1,500",
-        ]}
-      />
+      <WalletView />
     </RequireAuth>
   );
 }

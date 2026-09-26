@@ -1,19 +1,18 @@
-import { RequireAuth } from "@/components/auth/require-auth";
-import { ComingSoon } from "@/components/layout/coming-soon";
+import type { Metadata } from "next";
+import { Suspense } from "react";
 
-// TODO(Person 3)
+import { RequireAuth } from "@/components/auth/require-auth";
+import { SettingsView } from "@/components/settings/settings-view";
+
+export const metadata: Metadata = { title: "Settings" };
+
+// [PERSON 3] Account settings + YouTube channel linking (Google OAuth).
 export default function SettingsPage() {
   return (
     <RequireAuth>
-      <ComingSoon
-        owner="Person 3 — YouTube OAuth"
-        title="Settings"
-        todo={[
-          "Connect YouTube (Google OAuth) -> shows linked channel",
-          "Required before submitting: the system checks the video belongs to this channel",
-          "Disconnect channel",
-        ]}
-      />
+      <Suspense>
+        <SettingsView />
+      </Suspense>
     </RequireAuth>
   );
 }

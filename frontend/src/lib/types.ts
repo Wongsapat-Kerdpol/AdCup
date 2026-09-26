@@ -60,6 +60,88 @@ export interface CampaignDetail extends Campaign {
   is_funded: boolean;
 }
 
+// Person 3 — mock checkout (POST /api/payments/checkout/{id})
+export type PaymentMethod = "promptpay" | "card";
+
+export interface CheckoutResponse {
+  campaign_id: number;
+  campaign_status: CampaignStatus;
+  transaction_id: number;
+  reference: string;
+  amount: string;
+  method: PaymentMethod;
+  paid_at: string;
+}
+
+// Person 3 — wallet (GET /api/wallet, POST /api/wallet/withdraw)
+export type TransactionType = "campaign_fund" | "payout" | "withdrawal";
+export type TransactionStatus = "pending" | "completed" | "failed";
+
+export interface WalletTransaction {
+  id: number;
+  type: TransactionType;
+  status: TransactionStatus;
+  gross_amount: string;
+  commission_amount: string;
+  net_amount: string;
+  reference: string | null;
+  campaign_id: number | null;
+  campaign_title: string | null;
+  submission_id: number | null;
+  views_from: number | null;
+  views_to: number | null;
+  created_at: string;
+}
+
+export interface Wallet {
+  balance: string;
+  min_withdrawal: string;
+  can_withdraw: boolean;
+  total_earned: string;
+  total_commission: string;
+  total_withdrawn: string;
+  transactions: WalletTransaction[];
+}
+
+export interface WithdrawResponse {
+  balance: string;
+  transaction: WalletTransaction;
+}
+
+// Person 3 — admin analytics (GET /api/admin/stats)
+export interface AdminStats {
+  users: {
+    total: number;
+    by_role: Record<UserRole, number>;
+    new_last_30d: number;
+    active_last_30d: number;
+  };
+  money: {
+    total_funded: string;
+    total_paid_out: string;
+    commission_revenue: string;
+    total_withdrawn: string;
+    locked_in_pools: string;
+    projected_commission: string;
+    transaction_count: number;
+  };
+  daily: { day: string; paid_out: string; commission: string; funded: string }[];
+  submissions_by_status: Record<SubmissionStatus, number>;
+  campaigns_by_status: Record<CampaignStatus, number>;
+  top_campaigns: {
+    id: number;
+    title: string;
+    brand_name: string;
+    status: CampaignStatus;
+    total_budget: string;
+    paid_out: string;
+    paid_out_percent: number;
+    submissions: number;
+    approved: number;
+    views: number;
+  }[];
+}
+
 export interface Paginated<T> {
   items: T[];
   total: number;
