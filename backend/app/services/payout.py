@@ -38,7 +38,11 @@ def process_payout(db: Session, submission: Submission) -> Transaction | None:
     """
     # Lock the campaign row first so two concurrent refreshes can't both read the same
     # remaining_budget and jointly overspend the pool.
-    campaign = db.scalar(select(Campaign).where(Campaign.id == submission.campaign_id).with_for_update())
+    # of=Campaign: Campaign.brand is lazy="joined", and Postgres can't lock the outer-joined
+    # users row (same fix as routers/payments.py::checkout_campaign).
+    campaign = db.scalar(
+        select(Campaign).where(Campaign.id == submission.campaign_id).with_for_update(of=Campaign)
+    )
 
     if submission.status != SubmissionStatus.approved:
         return None

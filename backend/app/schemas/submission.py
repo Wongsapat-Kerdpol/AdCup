@@ -45,11 +45,15 @@ class Submission(BaseModel):
 
 
 class SubmissionForReview(Submission):
-    """Everything the admin review queue needs, joined with campaign + creator info."""
+    """Everything the admin review queue needs, joined with campaign + creator info.
 
-    campaign_title: str
-    campaign_requirements: str
-    creator_name: str
+    Defaults let routers/review.py build this the same way RefreshResult is built in
+    routers/youtube.py: model_validate(submission).model_copy(update={...}).
+    """
+
+    campaign_title: str = ""
+    campaign_requirements: str = ""
+    creator_name: str = ""
 
 
 class RejectRequest(BaseModel):
