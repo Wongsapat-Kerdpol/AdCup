@@ -19,12 +19,13 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
-import type { Campaign, CampaignListResponse, Submission } from "@/lib/types";
+import type { Campaign, CampaignDetail, Paginated, Submission } from "@/lib/types";
 import { cn, formatNumber, formatTHB, toNumber } from "@/lib/utils";
 
 export function SubmissionsView() {
   const [submissions, setSubmissions] = useState<Submission[] | null>(null);
-  const [campaigns, setCampaigns] = useState<Record<number, Campaign>>({});
+  const [activeCampaigns, setActiveCampaigns] = useState<Campaign[]>([]);
+  const [campaignDetails, setCampaignDetails] = useState<Record<number, CampaignDetail>>({});
   const [refreshingId, setRefreshingId] = useState<number | null>(null);
   const [pickerCampaignId, setPickerCampaignId] = useState<string>("");
 
@@ -32,10 +33,20 @@ export function SubmissionsView() {
     try {
       const [mine, active] = await Promise.all([
         api<Submission[]>("/api/submissions/mine"),
-        api<CampaignListResponse>("/api/campaigns", { query: { status: "active", page_size: 100 } }),
+        api<Paginated<Campaign>>("/api/campaigns", { query: { status: "active", page_size: 100 } }),
       ]);
       setSubmissions(mine);
-      setCampaigns(Object.fromEntries(active.items.map((c) => [c.id, c])));
+      setActiveCampaigns(active.items);
+
+      // Fetch full campaign details (min_views, title) for every campaign referenced by a
+      // submission — the list endpoint above doesn't include min_views.
+      const ids = Array.from(new Set(mine.map((s) => s.campaign_id)));
+      const details = await Promise.all(
+        ids.map((id) => api<CampaignDetail>(`/api/campaigns/${id}`).catch(() => null)),
+      );
+      setCampaignDetails(
+        Object.fromEntries(details.filter((c): c is CampaignDetail => c !== null).map((c) => [c.id, c])),
+      );
     } catch (err) {
       toast.error(`Could not load your submissions: ${(err as Error).message}`);
     }
@@ -57,8 +68,6 @@ export function SubmissionsView() {
       setRefreshingId(null);
     }
   }
-
-  const activeCampaigns = Object.values(campaigns);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 py-6">
@@ -111,7 +120,7 @@ export function SubmissionsView() {
             <SubmissionCard
               key={s.id}
               submission={s}
-              campaign={campaigns[s.campaign_id]}
+              campaign={campaignDetails[s.campaign_id]}
               refreshing={refreshingId === s.id}
               onRefresh={() => refreshViews(s.id)}
             />
@@ -129,7 +138,7 @@ function SubmissionCard({
   onRefresh,
 }: {
   submission: Submission;
-  campaign: Campaign | undefined;
+  campaign: CampaignDetail | undefined;
   refreshing: boolean;
   onRefresh: () => void;
 }) {
