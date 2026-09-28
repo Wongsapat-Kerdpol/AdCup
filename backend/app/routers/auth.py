@@ -2,20 +2,21 @@
 
 [MAIN]     GET  /api/auth/me          -> current user (used by the frontend auth guard)
 [MAIN]     POST /api/auth/dev-login   -> one-click login as a seeded user (dev only)
-[PERSON 1] POST /api/auth/register    -> TODO
-[PERSON 1] POST /api/auth/login       -> TODO
+[PERSON 1] POST /api/auth/register    -> create a brand/creator account, returns TokenResponse
+[PERSON 1] POST /api/auth/login       -> email + password, returns TokenResponse
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.core.security import create_access_token
+from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
-from app.schemas.user import DevLoginRequest, TokenResponse, UserPublic
+from app.schemas.user import DevLoginRequest, LoginRequest, RegisterRequest, TokenResponse, UserPublic
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -35,5 +36,34 @@ def dev_login(body: DevLoginRequest, db: Session = Depends(get_db)):
     return TokenResponse(access_token=create_access_token(user.id, user.role.value), user=user)
 
 
-# TODO(Person 1): POST /register  — validate input, hash_password(), create User, return TokenResponse
-# TODO(Person 1): POST /login     — verify_password(), return TokenResponse (use create_access_token)
+# --- Person 1 ---
+
+
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+def register(body: RegisterRequest, db: Session = Depends(get_db)):
+    if db.scalar(select(User).where(User.email == body.email)):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email already exists")
+
+    user = User(
+        email=body.email,
+        display_name=body.display_name,
+        role=body.role,
+        password_hash=hash_password(body.password),
+    )
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError:  # two sign-ups with the same email at the same moment
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email already exists")
+    db.refresh(user)
+    return TokenResponse(access_token=create_access_token(user.id, user.role.value), user=user)
+
+
+@router.post("/login", response_model=TokenResponse)
+def login(body: LoginRequest, db: Session = Depends(get_db)):
+    user = db.scalar(select(User).where(User.email == body.email.strip().lower()))
+    # Same message for "no such email" and "wrong password" so attackers can't probe which emails exist.
+    if user is None or not verify_password(body.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
+    return TokenResponse(access_token=create_access_token(user.id, user.role.value), user=user)
