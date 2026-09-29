@@ -60,6 +60,30 @@ export interface CampaignDetail extends Campaign {
   is_funded: boolean;
 }
 
+// Person 1 — brand campaign management (POST/GET /api/brand/campaigns, PATCH/DELETE /api/brand/campaigns/{id})
+export interface CampaignInput {
+  title: string;
+  description: string;
+  requirements: string;
+  category: CampaignCategory;
+  platforms: Platform[];
+  thumbnail_url: string | null;
+  rate_per_1k_views: string;
+  total_budget: string;
+  cap_per_post: string | null;
+  cap_per_profile: string | null;
+  min_views: number;
+  deadline: string | null;
+}
+
+export interface BrandCampaign extends CampaignDetail {
+  stats: {
+    submissions: Record<SubmissionStatus, number>;
+    creators: number;
+    total_views: number;
+  };
+}
+
 // Person 2 — submissions (POST /api/submissions, GET /api/submissions/mine,
 // GET /api/submissions/campaign/{id}, GET/POST /api/admin/review/*)
 export type RejectedBy = "system" | "admin";
