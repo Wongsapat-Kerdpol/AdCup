@@ -12,6 +12,7 @@ export const routes = {
   newCampaign: "/campaigns/new", // Person 1
   fundCampaign: (id: number | string) => `/campaigns/${id}/fund`, // Person 3
   brandCampaigns: "/brand/campaigns", // Person 1 (+ read-only submissions list from Person 2)
+  editCampaign: (id: number | string) => `/brand/campaigns/${id}/edit`, // Person 1 (guarded by the /brand prefix)
   submissions: "/submissions", // Person 2
   wallet: "/wallet", // Person 3
   settings: "/settings", // Person 3 (YouTube connect)
