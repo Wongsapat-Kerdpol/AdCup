@@ -9,10 +9,10 @@ answers two questions with the algorithms in services/allocation.py:
                                    (O(n log days) instead of simulating every day).
   2. What would MY video earn?     Replay the payout rounds the platform will run (one per day):
                                    everybody is paid in full until the pool runs out, and in the
-                                   round where it runs out the rest is split max-min fair (sort +
-                                   prefix sums + binary search for the "water level"). A new video
-                                   only joins after it has been reviewed, so the backlog that
-                                   approved videos have already earned is paid out before it.
+                                   round where it runs out everybody gets the same percentage of
+                                   what they earned. A new video only joins after it has been
+                                   reviewed, so the backlog that approved videos have already
+                                   earned is paid out before it.
 
 Projection model (deliberately simple — see the README section on the outlook for caveats):
   - a video keeps gaining views at its average rate so far: view_count / age_in_days
@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session
 from app.core.config import COMMISSION_RATE, DEFAULT_MIN_VIEWS
 from app.models.campaign import Campaign, CampaignStatus
 from app.models.submission import Submission, SubmissionStatus
-from app.services.allocation import first_step_reaching, max_min_fair_share
+from app.services.allocation import first_step_reaching, proportional_share
 from app.services.payout import from_satang, to_satang
 
 DEFAULT_HORIZON_DAYS = 30  # used when the campaign has no deadline
@@ -149,12 +149,12 @@ def campaign_outlook(
         if last_round is None:
             earned = full_claim
         else:
-            # ... then split what is left in that round max-min fair; later rounds pay nothing.
+            # ... then share what is left in that round proportionally; later rounds pay nothing.
             before = [0] * len(videos) if last_round == 1 else claims_at(last_round - 1)
             demands = [after - prior for after, prior in zip(claims_at(last_round), before)]
             demands.append(mine_at(last_round) - mine_at(last_round - 1))
             round_pool = pool - everyone_at(last_round - 1)
-            earned = mine_at(last_round - 1) + max_min_fair_share(demands, max(round_pool, 0))[-1]
+            earned = mine_at(last_round - 1) + proportional_share(demands, max(round_pool, 0))[-1]
     fill = earned / full_claim if full_claim > 0 else None
 
     gross = from_satang(earned)

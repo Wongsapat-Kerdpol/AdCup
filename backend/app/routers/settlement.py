@@ -2,7 +2,7 @@
 
   POST /api/admin/payout-round — admin: pay every approved video for the views it has gained since
                                   its last payout, using the views already stored (no YouTube calls).
-                                  If a campaign's pool can't cover everyone, it is split max-min fair
+                                  If a campaign's pool can't cover everyone, every video gets the same percentage of what it earned
                                   (see services/payout.py and services/allocation.py).
 """
 

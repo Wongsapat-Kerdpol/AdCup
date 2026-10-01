@@ -18,7 +18,7 @@ export default function DiscoverPage() {
             <p className="text-sm font-semibold">Get paid for the views you drive</p>
             <p className="text-xs text-muted-foreground">
               Pick a campaign, post an original video, submit the link. Approved posts earn from the pool — everyone is paid
-              together, and the pool is shared fairly.
+              together, and if the pool runs short everyone gets the same share.
             </p>
           </div>
         </div>

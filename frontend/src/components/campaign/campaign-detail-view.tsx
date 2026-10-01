@@ -396,9 +396,9 @@ function HowYouGetPaid({ campaign }: { campaign: CampaignDetail }) {
         ))}
       </ol>
       <p className="text-xs text-muted-foreground">
-        Everyone approved is paid together in payout rounds. If the pool can&apos;t cover everyone, smaller earners are
-        paid in full first and the rest is split equally — approval order doesn&apos;t matter. Once the pool runs out,
-        the campaign ends.
+        Everyone approved is paid together in payout rounds. If the pool can&apos;t cover everyone, every video gets the
+        same percentage of what it earned — approval order doesn&apos;t matter. Once the pool runs out, the campaign
+        ends.
       </p>
     </Section>
   );

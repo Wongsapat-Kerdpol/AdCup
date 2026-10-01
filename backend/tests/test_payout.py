@@ -1,4 +1,4 @@
-"""Payout engine tests — payout rounds with a max-min fair split of the pool."""
+"""Payout engine tests — payout rounds with a proportional split of the pool."""
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -71,7 +71,7 @@ def test_cap_per_profile_is_shared_between_a_creators_videos(db, make_campaign, 
     settle_campaign(db, campaign.id)
 
     assert sub1.gross_amount == Decimal("0.50")
-    assert sub2.gross_amount == Decimal("0.50")  # 1.00 allowance split fairly, not first video takes all
+    assert sub2.gross_amount == Decimal("0.50")  # 1.00 allowance shared proportionally, not first video takes all
     assert creator.wallet_balance == Decimal("0.90")
 
 
@@ -87,17 +87,16 @@ def test_pool_exhaustion_completes_campaign(db, make_campaign, make_user, make_s
     assert campaign.status == CampaignStatus.completed
 
 
-def test_short_pool_is_split_max_min_fair(db, make_campaign, make_user, make_submission):
-    """Earned 0.50 / 2.00 / 5.00 from a pool of 3.00: the small one is paid in full, the other two
-    share what is left equally."""
+def test_short_pool_is_split_proportionally(db, make_campaign, make_user, make_submission):
+    """Earned 0.50 / 2.00 / 5.00 (7.50 in total) from a pool of 3.00: everybody gets 40% of what they earned."""
     campaign = make_campaign(rate_per_1k_views=Decimal("1.00"), total_budget=Decimal("3.00"))
     small, medium, large = (approved(make_submission, campaign, make_user(UserRole.creator), v) for v in (500, 2000, 5000))
 
     settle_campaign(db, campaign.id)
 
-    assert small.gross_amount == Decimal("0.50")
-    assert medium.gross_amount == Decimal("1.25")
-    assert large.gross_amount == Decimal("1.25")
+    assert small.gross_amount == Decimal("0.20")
+    assert medium.gross_amount == Decimal("0.80")
+    assert large.gross_amount == Decimal("2.00")
     assert campaign.paid_out == Decimal("3.00")
 
 

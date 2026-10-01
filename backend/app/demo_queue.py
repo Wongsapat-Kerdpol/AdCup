@@ -9,7 +9,7 @@ with fake creators and approved videos (plus a few waiting for review):
 Only ever run this against a throwaway database — it adds users and campaigns. Safe to re-run (it
 skips if the demo creators exist):
     docker compose exec backend python -m app.demo_queue
-Then log in as admin@adcup.dev and press "Run payout round" on /admin to see the fair split.
+Then log in as admin@adcup.dev and press "Run payout round" on /admin to see the proportional split.
 """
 
 import random

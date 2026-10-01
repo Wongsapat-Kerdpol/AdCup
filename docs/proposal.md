@@ -18,7 +18,7 @@
 
 - **Scope:**
 
-- **Included:** campaign creation, campaign browsing, open (no pre-approval) joining, content submission and view tracking, a two-stage review before any payout (automatic system check + admin review of the brand's content requirements), incremental payouts as views grow, per-post and per-creator payout caps, first-come-first-served reward pool distribution logic (queue-based), simulated payment/checkout for funding a campaign, a real OAuth integration with YouTube to pull real view counts, a flat platform commission on every payout, an in-app wallet with withdrawal, and an admin analytics dashboard.
+- **Included:** campaign creation, campaign browsing, open (no pre-approval) joining, content submission and view tracking, a two-stage review before any payout (automatic system check + admin review of the brand's content requirements), incremental payouts as views grow, per-post and per-creator payout caps, proportional reward pool distribution logic (if the pool cannot cover every approved video, each one is paid the same percentage of what it earned), simulated payment/checkout for funding a campaign, a real OAuth integration with YouTube to pull real view counts, a flat platform commission on every payout, an in-app wallet with withdrawal, and an admin analytics dashboard.
 
 - **Excluded (for this course project):** real payment/bank transfer of money(process takes longer than the course timeline)
 
@@ -44,7 +44,7 @@
 
 - Each submission goes through a two-stage review. **Round 1 — System check (automatic):** the video must exist and be public, belong to the creator's connected YouTube channel, be published after the campaign started, not be a duplicate, and reach the campaign's minimum views (default 1,000 views; a video below the minimum waits and is re-checked as views grow). **Round 2 — Admin review:** an admin watches the video and checks it against the brand's content requirements (e.g. "the water bottle must be visible"), then approves or rejects it with a reason. A submission that is not approved never generates a payout.
 
-- Once approved, the submission earns incrementally: every time its view count is refreshed, the system pays only for the new views since the last payout, from the campaign's remaining reward pool, in the order submissions were approved (first-come-first-served), limited by the campaign's cap per post and cap per creator, until the pool runs out. Later approved submissions after the pool is empty earn nothing, and the app clearly shows the remaining pool balance so creators can decide if it's still worth joining.
+- Once approved, the submission earns incrementally: in each payout round (run by an admin after the view counts are refreshed), the system pays only for the new views since the last payout, from the campaign's remaining reward pool, limited by the campaign's cap per post and cap per creator. If the pool cannot cover everything the approved videos have earned, every video is paid the same percentage of what it earned (approval order does not matter), until the pool runs out. Videos approved after the pool is empty earn nothing, and the app clearly shows the remaining pool balance, with an estimate of how much a new video could still earn, so creators can decide if it's still worth joining.
 
 - Every payout increment is credited (minus platform commission) to the creator's in-app wallet balance, so the balance grows continuously; creators can withdraw once their balance passes a minimum threshold.
 
@@ -82,7 +82,7 @@
 
 1. **Brand funds a campaign:** When a brand creates a campaign, they go through a mock checkout (Stripe Test Mode or a fake QR code) to "deposit" the reward budget into the campaign's pool. No real money moves — the backend just records a successful transaction and locks that amount to the campaign.
 
-2. **Creator submits, gets approved and earns as views grow:** The creator connects their YouTube account (real OAuth). The submission passes the automatic system check (ownership, publish date, minimum 1,000 views) and then the admin review. From then on, each time the video's views are refreshed from the YouTube Data API, the backend calculates the gross payout for the new views only (e.g. at 25 THB / 1,000 views: +25 THB at 1,000 views, then +50 THB more when it reaches 3,000 views), limited by the cap per post, the cap per creator and the campaign's remaining pool (first-come-first-served order), deducts the flat 10% commission, and credits the **net amount** to the creator's in-app wallet. Gross amount, commission amount, and net amount are recorded for every increment.
+2. **Creator submits, gets approved and earns as views grow:** The creator connects their YouTube account (real OAuth). The submission passes the automatic system check (ownership, publish date, minimum 1,000 views) and then the admin review. From then on, the video's views are refreshed from the YouTube Data API and, in each payout round, the backend calculates the gross payout for the new views only (e.g. at 25 THB / 1,000 views: +25 THB at 1,000 views, then +50 THB more when it reaches 3,000 views), limited by the cap per post, the cap per creator and the campaign's remaining pool (shared proportionally if the pool runs short), deducts the flat 10% commission, and credits the **net amount** to the creator's in-app wallet. Gross amount, commission amount, and net amount are recorded for every increment.
 
 3. **Wallet withdrawal:** Once a creator's wallet balance passes a minimum threshold — we used **1,500 THB (≈ $43)**, close to the $50 minimum real creators report — they can request a withdrawal through a mock "Cash Out" flow. No real bank transfer happens, but the balance and a transaction record update as if it did.
 
@@ -90,7 +90,7 @@
 
 - Each submission has a `status` field (pending = system check / under_review = admin review / approved / rejected, with who rejected it and why); only `approved` submissions are eligible for a payout calculation.
 
-- Each payout increment is stored as a row in the Transactions table with `gross_amount`, `commission_amount` (always 10%), `net_amount` and the view range it paid for, processed in the order submissions were approved so the reward pool depletes fairly (first-come-first-served). Each submission also stores how many views have already been paid, so no view is ever paid twice.
+- Each payout increment is stored as a row in the Transactions table with `gross_amount`, `commission_amount` (always 10%), `net_amount` and the view range it paid for, created in payout rounds, where a pool that runs short is shared proportionally between all approved submissions. Each submission also stores how many views have already been paid, so no view is ever paid twice.
 
 - A FastAPI service function calculates the commission on every payout before crediting the creator's wallet, so the platform's revenue logic is enforced in code, not just described in the UI.
 
@@ -100,7 +100,7 @@
 
 - **Week 2 (by 30 Sep):** Set up the boilerplate repo, register the Google Cloud OAuth app for YouTube (testing mode), Build database schema (Users, Campaigns, Submissions, Transactions) and authentication (register/login + Google OAuth account linking). Target ~40% of the app.
 
-- **Week 3 (by 7 Oct):** Build campaign creation & browsing, submission flow (YouTube real view pull), automatic system check, admin review screen, first-come-first-served payout calculation logic with commission deduction. Target ~70% of the app.
+- **Week 3 (by 7 Oct):** Build campaign creation & browsing, submission flow (YouTube real view pull), automatic system check, admin review screen, proportional payout calculation logic with commission deduction. Target ~70% of the app.
 
 - **Week 4 (by 14 Oct):** Finish wallet & withdrawal, admin analytics dashboard, full testing, record progress video.
 
@@ -112,6 +112,6 @@
 
 - Authentication & role-based access (Brand / Creator / Admin) working, including real YouTube OAuth linking.
 
-- Full flow working end-to-end: create & fund campaign → creator joins & submits → system check → admin approves → payouts added as views grow (first-come-first-served) → creator withdraws.
+- Full flow working end-to-end: create & fund campaign → creator joins & submits → system check → admin approves → payouts added in payout rounds as views grow (shared proportionally if the pool runs short) → creator withdraws.
 
 - Admin dashboard showing at least 3 key business metrics.

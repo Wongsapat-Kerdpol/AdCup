@@ -2,7 +2,7 @@
 
 Brands post campaigns with a fixed reward budget and a published rate per views. Creators post original
 YouTube videos and submit the link. Each video goes through a **system check** and an **admin review**;
-once approved it **earns as its views grow**, paid in rounds that share the campaign pool fairly between
+once approved it **earns as its views grow**, paid in rounds that share the campaign pool between
 all approved videos (minus a flat 10% commission). See `docs/proposal.md` for the full design.
 
 **Stack:** FastAPI · PostgreSQL · Next.js 15 (App Router) + shadcn/ui + Tailwind v4 · Docker Compose
@@ -78,9 +78,8 @@ Creator submits YouTube link
 - **Brands never approve.** They create/fund campaigns and see submissions read-only.
 - **Payout rounds** (`services/payout.py`): `new_views = view_count - paid_views` →
   `gross = new_views / 1000 × rate`, limited by **cap per post** and **cap per profile**. If the **remaining
-  pool** covers everyone, everyone is paid in full; otherwise it is split **max-min fair**
-  (`services/allocation.py`): small earners are paid in full first, the rest share what is left equally.
-  Approval order and refresh timing don't matter. 10% commission, net → creator wallet, one `Transaction`
+  pool** covers everyone, everyone is paid in full; otherwise every video gets the **same percentage of what it
+  earned** (`services/allocation.py`, exact to the satang). Approval order and refresh timing don't matter. 10% commission, net → creator wallet, one `Transaction`
   per video per round. Example at ฿1 / 1K views: round at 1,000 views → +฿1; next round at 3,000 views → +฿2.
 - **Who runs a round:** an admin (`POST /api/admin/payout-round`, the "Run payout round" button on `/admin`)
   or `POST /api/youtube/refresh-all`, which refreshes every video first and then runs one round.

@@ -68,8 +68,8 @@ def test_room_to_spare_is_open_and_a_tight_pool_is_competitive(db, make_campaign
     assert campaign_outlook(db, roomy, views_per_day=1000, now=NOW).verdict == OPEN
 
     # The existing video (10 views/day) claims ฿1.23 by day 23, the newcomer (1,000 views/day, approved
-    # on day 2) ฿23. In round 24 only ฿0.77 is left: the 1-satang claim is paid, the newcomer gets ฿0.76 of
-    # its ฿1.00 -> ฿23.76 of the ฿30 it would have earned.
+    # on day 2) ฿23. In round 24 only ฿0.77 is left, shared in proportion to the claims (1 and 100 satang): the
+    # newcomer gets ฿0.76 of its ฿1.00 -> ฿23.76 of the ฿30 it would have earned.
     tight = make_campaign(rate_per_1k_views=Decimal("1.00"), total_budget=Decimal("25.00"))
     approved(make_submission, make_user, tight, views=1000, days_old=100)
     outlook = campaign_outlook(db, tight, views_per_day=1000, now=NOW)

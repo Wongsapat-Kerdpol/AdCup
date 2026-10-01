@@ -1,16 +1,16 @@
-"""Payout engine — settlement rounds, max-min fair split, flat 10% commission.
+"""Payout engine — settlement rounds, proportional split, flat 10% commission.
 
 Money only flows for submissions with status == approved (passed system check AND admin review).
 Payouts are INCREMENTAL: a round pays only for the views gained since the last round.
 
   Example (rate ฿1 / 1K views): approved at 1,000 views -> +฿1 gross; next round at 3,000 -> +฿2 gross.
 
-HOW A ROUND WORKS (replaces first-come-first-served)
+HOW A ROUND WORKS (nobody is paid first: the whole pool is shared at once)
   1. demand : every approved video has earned (view_count - paid_views) / 1000 * rate, limited by
               cap_per_post and (per creator) cap_per_profile.
-  2. split  : if the pool covers all demands everybody is paid in full. Otherwise the pool is split
-              max-min fair (services/allocation.py): small earners are paid in full first, the rest
-              share what is left equally. Approval order and refresh timing don't matter.
+  2. split  : if the pool covers all demands everybody is paid in full. Otherwise every video gets the
+              same percentage of what it earned (services/allocation.py). Approval order and refresh
+              timing don't matter.
   3. pay    : 10% commission, net -> creator wallet, one Transaction per video per round.
 
 Refreshing a video only stores its new view count — it never moves money — so pressing the
@@ -34,7 +34,7 @@ from app.models.campaign import Campaign, CampaignStatus
 from app.models.submission import Submission, SubmissionStatus
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.models.user import User
-from app.services.allocation import max_min_fair_share
+from app.services.allocation import proportional_share
 
 
 def split_commission(gross: Decimal) -> tuple[Decimal, Decimal]:
@@ -67,14 +67,14 @@ def _demands(campaign: Campaign, submissions: list[Submission]) -> list[int]:
 
     if campaign.cap_per_profile is not None:
         # A creator's remaining allowance is shared between their own videos with the same
-        # fair-share rule, before the pool is split between creators.
+        # proportional rule, before the pool is split between creators.
         by_creator: dict[int, list[Submission]] = defaultdict(list)
         for submission in submissions:
             by_creator[submission.creator_id].append(submission)
         for videos in by_creator.values():
             earned = sum(to_satang(v.gross_amount) for v in videos)
             allowance = max(to_satang(campaign.cap_per_profile) - earned, 0)
-            capped = max_min_fair_share([demand[v.id] for v in videos], allowance)
+            capped = proportional_share([demand[v.id] for v in videos], allowance)
             for video, amount in zip(videos, capped):
                 demand[video.id] = amount
 
@@ -107,7 +107,7 @@ def settle_campaign(db: Session, campaign_id: int) -> list[Transaction]:
         return []
 
     demands = _demands(campaign, submissions)
-    granted = max_min_fair_share(demands, to_satang(campaign.remaining_budget))
+    granted = proportional_share(demands, to_satang(campaign.remaining_budget))
 
     transactions: list[Transaction] = []
     for submission, satang in zip(submissions, granted):
