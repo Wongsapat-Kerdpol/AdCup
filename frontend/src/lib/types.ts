@@ -208,3 +208,33 @@ export interface Paginated<T> {
   page: number;
   page_size: number;
 }
+
+// Campaign outlook — GET /api/campaigns/{id}/outlook (is the campaign still worth joining?)
+export type OutlookVerdict = "open" | "competitive" | "crowded" | "closed";
+
+export interface CampaignOutlook {
+  verdict: OutlookVerdict;
+  pool_remaining: string;
+  horizon_days: number;
+  projected_claims: string;
+  pressure: number | null;
+  exhausted_in_days: number | null;
+  exhausted_on: string | null;
+  approved_videos: number;
+  in_review_videos: number;
+  newcomer: {
+    views_per_day: number;
+    assumption: "input" | "median" | "default";
+    expected_gross: string;
+    expected_net: string;
+    fill_ratio: number | null;
+  };
+}
+
+// POST /api/admin/payout-round
+export interface PayoutRoundResult {
+  campaigns_settled: number;
+  payouts: number;
+  total_gross: string;
+  total_net: string;
+}

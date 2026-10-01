@@ -5,7 +5,18 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.database import init_db
-from app.routers import admin, auth, campaign_manage, campaigns, payments, review, submissions, youtube
+from app.routers import (
+    admin,
+    auth,
+    campaign_manage,
+    campaigns,
+    outlook,
+    payments,
+    review,
+    settlement,
+    submissions,
+    youtube,
+)
 from app.seed import seed_if_empty
 
 
@@ -30,11 +41,13 @@ app.add_middleware(
 # Main
 app.include_router(auth.router)
 app.include_router(campaigns.router)
+app.include_router(outlook.router)
 # Person 1
 app.include_router(campaign_manage.router)
 # Person 2
 app.include_router(submissions.router)
 app.include_router(review.router)
+app.include_router(settlement.router)
 # Person 3
 app.include_router(youtube.router)
 app.include_router(payments.router)

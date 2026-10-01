@@ -25,6 +25,7 @@ import {
 import { toast } from "sonner";
 
 import { CampaignThumbnail, categoryMeta } from "@/components/campaign/campaign-card";
+import { CampaignOutlookCard } from "@/components/campaign/campaign-outlook";
 import { CampaignStatusBadge } from "@/components/campaign/campaign-status-badge";
 import { PlatformIcon, platformLabels } from "@/components/campaign/platform-icon";
 import { SubmissionStatusBadge } from "@/components/campaign/submission-status-badge";
@@ -161,6 +162,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
               Only creators can submit videos to campaigns.
             </div>
           )}
+          {campaign.is_funded && !isOwner && <CampaignOutlookCard campaignId={campaign.id} />}
           <EarningsExample campaign={campaign} />
         </aside>
       </div>
@@ -373,7 +375,7 @@ function HowYouGetPaid({ campaign }: { campaign: CampaignDetail }) {
     {
       icon: CheckCircle2,
       title: "Earn as views grow",
-      text: `Every new 1,000 views pays ${formatTHB(campaign.rate_per_1k_views)} (minus the 10% fee) into your wallet.`,
+      text: `Every new 1,000 views pays ${formatTHB(campaign.rate_per_1k_views)} (minus the 10% fee) into your wallet at the next payout round.`,
     },
   ];
   return (
@@ -394,7 +396,9 @@ function HowYouGetPaid({ campaign }: { campaign: CampaignDetail }) {
         ))}
       </ol>
       <p className="text-xs text-muted-foreground">
-        The pool pays first come, first served — once it runs out, the campaign ends.
+        Everyone approved is paid together in payout rounds. If the pool can&apos;t cover everyone, smaller earners are
+        paid in full first and the rest is split equally — approval order doesn&apos;t matter. Once the pool runs out,
+        the campaign ends.
       </p>
     </Section>
   );

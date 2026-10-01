@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Banknote, Coins, Landmark, RefreshCw, Users } from "lucide-react";
+import { ArrowRight, Banknote, Coins, HandCoins, Landmark, Loader2, RefreshCw, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { SubmissionStatusBadge } from "@/components/campaign/submission-status-badge";
@@ -14,7 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import type { AdminStats, SubmissionStatus } from "@/lib/types";
+import type { AdminStats, PayoutRoundResult, SubmissionStatus } from "@/lib/types";
 import { cn, formatNumber, formatTHB, toNumber } from "@/lib/utils";
 
 // Single-series data color, validated against the dark card surface (dataviz lightness/contrast checks).
@@ -39,6 +39,24 @@ export function AdminDashboard() {
     load();
   }, []);
 
+  const [paying, setPaying] = useState(false);
+  async function runPayoutRound() {
+    setPaying(true);
+    try {
+      const r = await api<PayoutRoundResult>("/api/admin/payout-round", { method: "POST" });
+      toast.success(
+        r.payouts === 0
+          ? "Payout round finished — nothing new to pay"
+          : `Paid ${r.payouts} video${r.payouts === 1 ? "" : "s"} in ${r.campaigns_settled} campaign${r.campaigns_settled === 1 ? "" : "s"} (${formatTHB(r.total_gross)} gross)`,
+      );
+      await load();
+    } catch (err) {
+      toast.error(`Payout round failed: ${(err as Error).message}`);
+    } finally {
+      setPaying(false);
+    }
+  }
+
   if (!stats) return <DashboardSkeleton />;
   const { users, money } = stats;
 
@@ -49,9 +67,14 @@ export function AdminDashboard() {
           <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
           <p className="text-sm text-muted-foreground">Platform health, money flow and campaign performance.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-          <RefreshCw className={cn(loading && "animate-spin")} /> Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={runPayoutRound} disabled={paying}>
+            {paying ? <Loader2 className="animate-spin" /> : <HandCoins />} Run payout round
+          </Button>
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={cn(loading && "animate-spin")} /> Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Headline + key figures */}

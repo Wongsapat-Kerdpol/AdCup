@@ -7,10 +7,11 @@ Contract (keep these signatures so Person 2 can code against them now):
 
 OAuth (done, Person 3) proves channel ownership: build_auth_url -> exchange_code -> get_my_channel.
 
-refresh_views stores the fresh stats on the submission, then hands over to Person 2:
+refresh_views stores the fresh stats on the submission, then:
     - status pending  -> services.verification.run_system_check(db, submission)
-    - status approved -> services.payout.process_payout(db, submission)
-Those are looked up at call time, so refresh works (views only) before Person 2's code lands.
+    - status approved -> nothing more: money is only paid in payout rounds (services.payout.settle_*),
+                         so refreshing earlier or more often gives no advantage.
+The system check is looked up at call time, so refresh works (views only) before it lands.
 Triggers: POST /api/youtube/refresh/{submission_id} and POST /api/youtube/refresh-all (routers/youtube.py).
 """
 
@@ -132,8 +133,6 @@ def refresh_views(db: Session, submission: Submission) -> VideoInfo | None:
     step = None
     if submission.status == SubmissionStatus.pending:
         step = _person2_step("verification", "run_system_check")
-    elif submission.status == SubmissionStatus.approved and info is not None:
-        step = _person2_step("payout", "process_payout")
     if step is not None:
         step(db, submission)
 

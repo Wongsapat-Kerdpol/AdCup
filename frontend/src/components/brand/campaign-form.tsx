@@ -294,7 +294,7 @@ export function CampaignForm({ campaign }: { campaign?: CampaignDetail }) {
           {/* Money */}
           <Section
             title="Budget & payout"
-            description="Creators earn per view from a shared pool, first come first served. A 10% platform fee comes out of creator payouts, not your budget."
+            description="Creators earn per view from a shared pool, paid out to everyone together in payout rounds. A 10% platform fee comes out of creator payouts, not your budget."
           >
             {moneyLocked && (
               <p className="flex items-start gap-2 rounded-lg bg-muted p-3 text-xs text-muted-foreground">

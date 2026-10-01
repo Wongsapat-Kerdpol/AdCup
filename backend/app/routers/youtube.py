@@ -9,8 +9,8 @@
   POST /api/youtube/disconnect              — revoke the token at Google and clear those fields
   POST /api/youtube/refresh/{submission_id} — creator (owner) or admin: services.youtube.refresh_views()
                                                (creators: at most once per REFRESH_COOLDOWN)
-  POST /api/youtube/refresh-all             — admin: refresh every pending + approved submission
-                                               (approved ones in approved_at order -> FCFS payouts)
+  POST /api/youtube/refresh-all             — admin: refresh every pending + approved submission,
+                                               then run one payout round (services/payout.py)
 Config: settings.google_client_id / google_client_secret / google_redirect_uri
 Google Cloud: enable "YouTube Data API v3", OAuth consent screen in Testing mode, add the team's
 emails as test users (tokens of Testing-mode apps expire after 7 days — reconnect if needed).
@@ -35,6 +35,7 @@ from app.models.user import User, UserRole
 from app.schemas.user import UserPublic
 from app.schemas.youtube import ConnectResponse, RefreshAllResult, RefreshResult
 from app.services import youtube as yt
+from app.services.payout import settle_all
 
 router = APIRouter(prefix="/api/youtube", tags=["youtube (Person 3)"])
 log = logging.getLogger(__name__)
@@ -153,15 +154,15 @@ def refresh_submission(
 
 @router.post("/refresh-all", response_model=RefreshAllResult)
 def refresh_all(_: User = Depends(require_role(UserRole.admin)), db: Session = Depends(get_db)):
-    """Pending first (they may move to the admin queue), then approved in approved_at order so the
-    pool is paid first-come-first-served. One failure doesn't stop the batch."""
+    """Refresh every pending + approved video, then run ONE payout round so every video is judged on
+    the same snapshot of views. One failure doesn't stop the batch."""
     pending = db.scalars(
         select(Submission).where(Submission.status == SubmissionStatus.pending).order_by(Submission.id)
     ).all()
     approved = db.scalars(
         select(Submission)
         .where(Submission.status == SubmissionStatus.approved)
-        .order_by(Submission.approved_at.asc().nulls_last(), Submission.id)
+        .order_by(Submission.id)
     ).all()
 
     result = RefreshAllResult(total=len(pending) + len(approved), refreshed=0, video_missing=0, failed=0)
@@ -176,4 +177,11 @@ def refresh_all(_: User = Depends(require_role(UserRole.admin)), db: Session = D
         result.refreshed += 1
         if info is None:
             result.video_missing += 1
+
+    try:
+        result.payouts = len(settle_all(db))
+        db.commit()
+    except Exception as exc:  # the views are already saved; the round can be re-run from /api/admin/payout-round
+        db.rollback()
+        log.warning("refresh-all: payout round failed: %s", exc)
     return result

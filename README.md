@@ -2,8 +2,8 @@
 
 Brands post campaigns with a fixed reward budget and a published rate per views. Creators post original
 YouTube videos and submit the link. Each video goes through a **system check** and an **admin review**;
-once approved it **earns continuously as its views grow** (first-come-first-served from the campaign
-pool, minus a flat 10% commission). See `docs/proposal.md` for the full design.
+once approved it **earns as its views grow**, paid in rounds that share the campaign pool fairly between
+all approved videos (minus a flat 10% commission). See `docs/proposal.md` for the full design.
 
 **Stack:** FastAPI · PostgreSQL · Next.js 15 (App Router) + shadcn/ui + Tailwind v4 · Docker Compose
 
@@ -76,13 +76,26 @@ Creator submits YouTube link
 ```
 
 - **Brands never approve.** They create/fund campaigns and see submissions read-only.
-- **Payout increment** (`services/payout.py`): `new_views = view_count - paid_views` →
-  `gross = new_views / 1000 × rate`, limited by **cap per post**, **cap per profile** and the
-  **remaining pool** (FCFS by `approved_at`). 10% commission, net → creator wallet, one `Transaction` per increment.
-  Example at ฿1 / 1K views: approved at 1,000 views → +฿1; refreshed at 3,000 views → +฿2.
+- **Payout rounds** (`services/payout.py`): `new_views = view_count - paid_views` →
+  `gross = new_views / 1000 × rate`, limited by **cap per post** and **cap per profile**. If the **remaining
+  pool** covers everyone, everyone is paid in full; otherwise it is split **max-min fair**
+  (`services/allocation.py`): small earners are paid in full first, the rest share what is left equally.
+  Approval order and refresh timing don't matter. 10% commission, net → creator wallet, one `Transaction`
+  per video per round. Example at ฿1 / 1K views: round at 1,000 views → +฿1; next round at 3,000 views → +฿2.
+- **Who runs a round:** an admin (`POST /api/admin/payout-round`, the "Run payout round" button on `/admin`)
+  or `POST /api/youtube/refresh-all`, which refreshes every video first and then runs one round.
+  Approving a video or refreshing its views never pays by itself.
 - **Views refresh** (Person 3): a "Refresh views" button and/or a periodic job. Pending submissions are
-  re-checked (round 1); approved ones get paid for new views.
-- **Withdrawal**: the wallet grows continuously, cash-out only once balance ≥ ฿1,500.
+  re-checked (round 1); for approved ones it only stores the new view count.
+- **Withdrawal**: the wallet grows with each payout round, cash-out only once balance ≥ ฿1,500.
+- **Campaign outlook** (`services/outlook.py`, `GET /api/campaigns/{id}/outlook`, the "Is it still worth
+  joining?" card on the campaign page): the pool alone is misleading because approved videos keep gaining views.
+  It projects their claims (average views/day so far, capped per post), finds the day the pool runs dry
+  (binary search on the answer), and replays the daily payout rounds to estimate what a new video would earn
+  (assumes ~2 days until approval, so the backlog is paid first). It is an **estimate**: it ignores cap per
+  profile and assumes constant views/day.
+- **Demo data for the outlook**: `docker compose exec backend python -m app.demo_queue` adds two demo
+  campaigns with videos. It adds users and campaigns — only run it against a throwaway database.
 - **Platforms**: YouTube only for now (`SUPPORTED_SUBMISSION_PLATFORMS`); TikTok / IG later.
 - **Hand-off between Person 2 & 3**: `services/youtube.py` defines `VideoInfo` + `get_video_info()`.
   Person 2 codes against it now (mock it while Person 3 builds it).
