@@ -14,9 +14,12 @@ earners are paid in full first, and whatever is left is split equally among the 
 
 Finding the "water level" quickly
 ---------------------------------
-Sort the demands, build prefix sums, then binary-search the level. O(n log n), versus O(n^2)
-for the textbook "redistribute until stable" loop (`max_min_fair_share_iterative`, kept as the
-reference implementation the tests and benchmark compare against).
+Sort the demands, build prefix sums, then binary-search the level: O(n log n) to build, then O(log n)
+per question once built. The textbook "redistribute until stable" loop
+(`max_min_fair_share_iterative`, kept as the reference implementation the tests compare against)
+costs O(n * passes) per question; passes <= n but is only a handful on realistic data, so for a
+single split the loop is just as fast (often faster). The sorted version wins when many questions
+are asked about the same demands, or demands are inserted/removed between questions.
 
 All amounts are integers (satang = 1/100 THB) so the split is exact and always sums to the pool.
 """
@@ -71,7 +74,8 @@ def max_min_fair_share(demands: Sequence[int], pool: int) -> list[int]:
 
 def max_min_fair_share_iterative(demands: Sequence[int], pool: int) -> list[int]:
     """Reference implementation: hand out an equal share, pay off whoever asked for less,
-    redistribute the leftover, repeat. O(n^2) worst case. Same result as `max_min_fair_share`."""
+    redistribute the leftover, repeat. O(n * passes), passes <= n (a handful in practice).
+    Same result as `max_min_fair_share`."""
     n = len(demands)
     alloc = [0] * n
     active = [i for i in range(n) if demands[i] > 0]
