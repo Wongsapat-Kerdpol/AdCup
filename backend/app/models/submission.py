@@ -59,7 +59,7 @@ class Submission(Base):
     # Round 2 (admin)
     reviewed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # approved_at defines the first-come-first-served payout order.
+    # approved_at: when the video joined the payout rounds (payouts don't depend on approval order).
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     rejected_by: Mapped[RejectedBy | None] = mapped_column(Enum(RejectedBy, native_enum=False, length=10))
     rejection_reason: Mapped[str | None] = mapped_column(Text)

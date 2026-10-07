@@ -10,6 +10,7 @@ from app.models.submission import RejectedBy, SubmissionStatus
 from app.models.user import UserRole
 from app.routers.review import approve, reject, review_queue
 from app.schemas.submission import RejectRequest
+from app.services.payout import settle_campaign
 
 
 def test_review_queue_lists_only_under_review(db, make_campaign, make_user, make_submission):
@@ -28,7 +29,7 @@ def test_review_queue_lists_only_under_review(db, make_campaign, make_user, make
     assert result[0].creator_name == "Mint Creates"
 
 
-def test_approve_sets_fields_and_triggers_payout(db, make_campaign, make_user, make_submission):
+def test_approve_sets_fields_and_pays_in_the_next_round(db, make_campaign, make_user, make_submission):
     admin = make_user(UserRole.admin)
     creator = make_user(UserRole.creator)
     campaign = make_campaign(rate_per_1k_views=Decimal("1.00"))
@@ -41,7 +42,10 @@ def test_approve_sets_fields_and_triggers_payout(db, make_campaign, make_user, m
     assert result.status == SubmissionStatus.approved
     assert result.approved_at is not None
     assert result.reviewed_by_id == admin.id
-    assert creator.wallet_balance == Decimal("0.90")  # payout ran immediately on approve
+    assert creator.wallet_balance == Decimal("0")  # approving never pays by itself
+
+    settle_campaign(db, campaign.id)  # money moves in payout rounds
+    assert creator.wallet_balance == Decimal("0.90")
 
 
 def test_approve_requires_under_review_status(db, make_campaign, make_user, make_submission):

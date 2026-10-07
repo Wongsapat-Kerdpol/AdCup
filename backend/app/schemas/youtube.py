@@ -31,3 +31,4 @@ class RefreshAllResult(BaseModel):
     refreshed: int
     video_missing: int
     failed: int
+    payouts: int = 0  # payments made by the payout round that follows the refresh

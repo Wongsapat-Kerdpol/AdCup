@@ -1,19 +1,32 @@
-"""[PERSON 2] Payout engine — incremental, first-come-first-served, flat 10% commission.
+"""Payout engine — settlement rounds, proportional split, flat 10% commission.
 
 Money only flows for submissions with status == approved (passed system check AND admin review).
-Payouts are INCREMENTAL: each time views are refreshed, pay only for the new views.
+Payouts are INCREMENTAL: a round pays only for the views gained since the last round.
 
-  Example (rate ฿1 / 1K views): approved at 1,000 views -> +฿1 gross; refresh at 3,000 -> +฿2 gross.
+  Example (rate ฿1 / 1K views): approved at 1,000 views -> +฿1 gross; next round at 3,000 -> +฿2 gross.
 
-Withdrawal (Person 3) is separate: wallet grows continuously, cash out only when >= MIN_WITHDRAWAL_THB.
+HOW A ROUND WORKS (nobody is paid first: the whole pool is shared at once)
+  1. demand : every approved video has earned (view_count - paid_views) / 1000 * rate, limited by
+              cap_per_post and (per creator) cap_per_profile.
+  2. split  : if the pool covers all demands everybody is paid in full. Otherwise every video gets the
+              same percentage of what it earned (services/allocation.py). Approval order and refresh
+              timing don't matter.
+  3. pay    : 10% commission, net -> creator wallet, one Transaction per video per round.
 
-Called only by routers/review.py (on approve) and app.services.youtube.refresh_views() — both
-manage their own db.commit(); this module only db.flush()es so it never breaks their transaction.
+Refreshing a video only stores its new view count — it never moves money — so pressing the
+refresh button earlier or more often gives no advantage. Rounds are run by an admin
+(POST /api/admin/payout-round) or at the end of POST /api/youtube/refresh-all, after every
+video has been refreshed, so all videos in a round are judged on the same snapshot.
+
+Withdrawal (Person 3) is separate: wallet grows with each round, cash out only when >= MIN_WITHDRAWAL_THB.
+
+Callers manage their own db.commit(); this module only db.flush()es so it never breaks their transaction.
 """
 
-from decimal import Decimal
+from collections import defaultdict
+from decimal import ROUND_DOWN, Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import COMMISSION_RATE
@@ -21,6 +34,7 @@ from app.models.campaign import Campaign, CampaignStatus
 from app.models.submission import Submission, SubmissionStatus
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.models.user import User
+from app.services.allocation import proportional_share
 
 
 def split_commission(gross: Decimal) -> tuple[Decimal, Decimal]:
@@ -29,96 +43,122 @@ def split_commission(gross: Decimal) -> tuple[Decimal, Decimal]:
     return commission, gross - commission
 
 
-def process_payout(db: Session, submission: Submission) -> Transaction | None:
-    """Pay for the views this submission has accrued since its last payout, if any.
+def to_satang(amount: Decimal) -> int:
+    """THB -> integer satang (rounded down), so the split is exact."""
+    return int((amount * 100).to_integral_value(rounding=ROUND_DOWN))
 
-    Returns the new Transaction, or None if there was nothing to pay (not approved, no new
-    views, or every new view was cut by a cap/exhausted pool). Idempotent to call repeatedly —
-    paid_views always advances to view_count so the same views are never paid twice.
+
+def from_satang(satang: int) -> Decimal:
+    return (Decimal(satang) / Decimal(100)).quantize(Decimal("0.01"))
+
+
+def _demands(campaign: Campaign, submissions: list[Submission]) -> list[int]:
+    """What each submission has earned since its last payout, in satang, after the caps."""
+    demand: dict[int, int] = {}
+    for submission in submissions:
+        new_views = submission.view_count - submission.paid_views
+        if new_views <= 0:
+            demand[submission.id] = 0
+            continue
+        satang = to_satang(Decimal(new_views) / Decimal(1000) * campaign.rate_per_1k_views)
+        if campaign.cap_per_post is not None:
+            satang = min(satang, max(to_satang(campaign.cap_per_post - submission.gross_amount), 0))
+        demand[submission.id] = satang
+
+    if campaign.cap_per_profile is not None:
+        # A creator's remaining allowance is shared between their own videos with the same
+        # proportional rule, before the pool is split between creators.
+        by_creator: dict[int, list[Submission]] = defaultdict(list)
+        for submission in submissions:
+            by_creator[submission.creator_id].append(submission)
+        for videos in by_creator.values():
+            earned = sum(to_satang(v.gross_amount) for v in videos)
+            allowance = max(to_satang(campaign.cap_per_profile) - earned, 0)
+            capped = proportional_share([demand[v.id] for v in videos], allowance)
+            for video, amount in zip(videos, capped):
+                demand[video.id] = amount
+
+    return [demand[s.id] for s in submissions]
+
+
+def settle_campaign(db: Session, campaign_id: int) -> list[Transaction]:
+    """Run one payout round for a campaign. Returns the Transactions created (possibly none).
+
+    Idempotent: paid_views advances to view_count for every video that had new views, even if its
+    share was cut to 0 by a cap or an empty pool — otherwise those views would be retried as "new"
+    in every future round.
     """
-    # Lock the campaign row first so two concurrent refreshes can't both read the same
+    # Lock the campaign row first so two concurrent rounds can't both read the same
     # remaining_budget and jointly overspend the pool.
     # of=Campaign: Campaign.brand is lazy="joined", and Postgres can't lock the outer-joined
     # users row (same fix as routers/payments.py::checkout_campaign).
-    campaign = db.scalar(
-        select(Campaign).where(Campaign.id == submission.campaign_id).with_for_update(of=Campaign)
+    campaign = db.scalar(select(Campaign).where(Campaign.id == campaign_id).with_for_update(of=Campaign))
+    if campaign is None:
+        return []
+
+    submissions = list(
+        db.scalars(
+            select(Submission)
+            .where(Submission.campaign_id == campaign.id, Submission.status == SubmissionStatus.approved)
+            .order_by(Submission.approved_at.asc().nulls_last(), Submission.id)
+        ).all()
     )
+    if not submissions:
+        return []
 
-    if submission.status != SubmissionStatus.approved:
-        return None
+    demands = _demands(campaign, submissions)
+    granted = proportional_share(demands, to_satang(campaign.remaining_budget))
 
-    new_views = submission.view_count - submission.paid_views
-    if new_views <= 0:
-        return None
+    transactions: list[Transaction] = []
+    for submission, satang in zip(submissions, granted):
+        views_from = submission.paid_views
+        if submission.view_count <= views_from:
+            continue
+        submission.paid_views = submission.view_count
+        if satang <= 0:
+            continue
 
-    gross = (Decimal(new_views) / Decimal(1000)) * campaign.rate_per_1k_views
+        gross = from_satang(satang)
+        commission, net = split_commission(gross)
 
-    if campaign.cap_per_post is not None:
-        remaining_post_cap = campaign.cap_per_post - submission.gross_amount
-        gross = min(gross, max(remaining_post_cap, Decimal("0")))
+        campaign.paid_out += gross
+        submission.gross_amount += gross
+        submission.commission_amount += commission
+        submission.net_amount += net
 
-    if campaign.cap_per_profile is not None:
-        creator_gross_so_far = db.scalar(
-            select(func.coalesce(func.sum(Submission.gross_amount), 0)).where(
-                Submission.campaign_id == campaign.id,
-                Submission.creator_id == submission.creator_id,
-            )
+        creator = db.get(User, submission.creator_id)
+        creator.wallet_balance += net
+
+        tx = Transaction(
+            user_id=creator.id,
+            campaign_id=campaign.id,
+            submission_id=submission.id,
+            type=TransactionType.payout,
+            status=TransactionStatus.completed,
+            gross_amount=gross,
+            commission_amount=commission,
+            net_amount=net,
+            views_from=views_from,
+            views_to=submission.view_count,
         )
-        remaining_profile_cap = campaign.cap_per_profile - creator_gross_so_far
-        gross = min(gross, max(remaining_profile_cap, Decimal("0")))
+        db.add(tx)
+        transactions.append(tx)
 
-    gross = min(gross, campaign.remaining_budget)
-    gross = gross.quantize(Decimal("0.01"))
-
-    # Always advance paid_views, even if gross was clamped to 0 — otherwise views cut by a
-    # cap/pool would be retried as "new" on every future refresh.
-    views_from = submission.paid_views
-    submission.paid_views = submission.view_count
-
-    if gross <= 0:
-        db.flush()
-        return None
-
-    commission, net = split_commission(gross)
-
-    campaign.paid_out += gross
     if campaign.remaining_budget <= 0:
         campaign.status = CampaignStatus.completed
-
-    submission.gross_amount += gross
-    submission.commission_amount += commission
-    submission.net_amount += net
-
-    creator = db.get(User, submission.creator_id)
-    creator.wallet_balance += net
-
-    tx = Transaction(
-        user_id=creator.id,
-        campaign_id=campaign.id,
-        submission_id=submission.id,
-        type=TransactionType.payout,
-        status=TransactionStatus.completed,
-        gross_amount=gross,
-        commission_amount=commission,
-        net_amount=net,
-        views_from=views_from,
-        views_to=submission.view_count,
-    )
-    db.add(tx)
     db.flush()
-    return tx
+    return transactions
 
 
-def process_all_payouts(db: Session) -> list[Transaction]:
-    """Batch refresh: pay every approved submission, oldest approval first (FCFS)."""
-    submissions = db.scalars(
-        select(Submission)
-        .where(Submission.status == SubmissionStatus.approved)
-        .order_by(Submission.approved_at.asc().nulls_last(), Submission.id)
+def settle_all(db: Session) -> list[Transaction]:
+    """One payout round for every campaign that has approved videos with unpaid views."""
+    campaign_ids = db.scalars(
+        select(Submission.campaign_id)
+        .where(Submission.status == SubmissionStatus.approved, Submission.view_count > Submission.paid_views)
+        .distinct()
+        .order_by(Submission.campaign_id)
     ).all()
-    results = []
-    for submission in submissions:
-        tx = process_payout(db, submission)
-        if tx is not None:
-            results.append(tx)
+    results: list[Transaction] = []
+    for campaign_id in campaign_ids:
+        results.extend(settle_campaign(db, campaign_id))
     return results

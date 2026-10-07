@@ -6,8 +6,7 @@ video and approves or rejects. Every endpoint is guarded with Depends(require_ro
   GET  /api/admin/review                  — queue: submissions with status=under_review, oldest first,
                                              incl. campaign.requirements, video url/title, views, creator
   POST /api/admin/review/{id}/approve     — status=approved, approved_at=now, reviewed_by_id/at
-                                             -> immediately services.payout.process_payout() for the
-                                                views it already has
+                                             (earns from the next payout round — see services/payout.py)
   POST /api/admin/review/{id}/reject      — body {reason}; status=rejected, rejected_by=admin
 """
 
@@ -25,7 +24,6 @@ from app.models.user import User, UserRole
 from app.schemas.submission import RejectRequest
 from app.schemas.submission import Submission as SubmissionSchema
 from app.schemas.submission import SubmissionForReview
-from app.services.payout import process_payout
 
 router = APIRouter(prefix="/api/admin/review", tags=["admin review (Person 2)"])
 
@@ -63,13 +61,9 @@ def approve(
     submission = _get_under_review(db, submission_id)
 
     submission.status = SubmissionStatus.approved
-    submission.approved_at = datetime.now(timezone.utc)  # FCFS payout order across the whole system
+    submission.approved_at = datetime.now(timezone.utc)
     submission.reviewed_by_id = user.id
     submission.reviewed_at = datetime.now(timezone.utc)
-    db.flush()
-
-    process_payout(db, submission)  # pay immediately for the views it already has
-
     db.commit()
     db.refresh(submission)
     return submission
