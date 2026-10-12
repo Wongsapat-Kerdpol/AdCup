@@ -115,7 +115,42 @@ AdCup มีกฎ **cap per profile** คือ เพดานเงิน gro
 - [ ] seed สร้างบัญชีอะไรบ้าง
 
 ### 2.3 ผลสำรวจ Phase 0
-*(Claude เขียนส่วนนี้หลังสำรวจเสร็จ)*
+*สำรวจเมื่อ 2026-10-12 บน `feature/linked-accounts` (`eede625`) ข้อ 2.1 ยังถูกต้องทั้งหมด*
+
+**คำตอบ checklist ข้อ 2.2**
+| ข้อ | ผลที่เจอในโค้ดจริง |
+|---|---|
+| ระบบจ่ายเงิน / key ของ cap per profile | `services/payout.py` → `_demands()` จัดกลุ่มด้วย `by_creator[submission.creator_id]` (บรรทัด 73) แล้วใช้ `allowance = cap_per_profile − sum(gross_amount ของคลิปในกลุ่ม)` · **จุดเดียวที่ต้องเปลี่ยน key** ตามข้อ 6.5 · `_demands` ได้แค่ `Submission` จึงต้องโหลด `profile_group_id` ของ creator เพิ่ม |
+| ฟังก์ชันแบ่งตามสัดส่วน | `services/allocation.py` → `proportional_share(demands, pool)` (หน่วยสตางค์ int, largest-remainder, เสมอให้ตำแหน่งต่ำสุด) · `_demands` ใช้ตัวนี้แบ่ง allowance อยู่แล้ว **ใช้ซ้ำได้ทันที** |
+| lock `FOR UPDATE` | มี: `settle_campaign()` lock แถว campaign (`payout.py:95`, `with_for_update(of=Campaign)`) · `withdraw()` lock แถว user (`payments.py:147`) |
+| payout เกิดตอนไหน | **ไม่มี job รายวัน** มีแค่ `POST /api/admin/payout-round` (`routers/settlement.py` → `settle_all`) และท้าย `POST /api/youtube/refresh-all` · approve และ refresh ไม่จ่ายเงิน |
+| outlook ใช้ per-creator cap ไหม | ไม่ใช้ (`services/outlook.py` docstring: "cap_per_profile is ignored") → **ไม่ต้องแก้** |
+| endpoint เดิม | ยังอยู่ที่เดิมหมด: `routers/auth.py` `register()` (lowercase ใน `schemas/user.py::RegisterRequest.lower_email`) / `login()` · `routers/youtube.py` `callback()` (scope `youtube.readonly` อย่างเดียว ยังไม่มี `openid`) · `routers/submissions.py` `create_submission()` · `routers/payments.py` `withdraw()` |
+| ตาราง/ฟิลด์บัญชีรับเงิน | ยังไม่มี |
+| `TransactionType` | `campaign_fund`, `payout`, `withdrawal` (ยังไม่มี `adjustment`) |
+| baseline เทสต์ | `docker compose exec -T backend pytest -q` → **46 passed in 22.92s** |
+| seed | `brand@adcup.dev` (#1), `brand2@adcup.dev` (#2), `creator@adcup.dev` (#3), `admin@adcup.dev` (#4) + 16 แคมเปญ ไม่มีคลิป · `app/demo_queue.py` สร้าง creator ปลอม + คลิป approved ด้วยการ insert ตรง (ไม่ผ่าน API จึงไม่โดน D8) |
+
+**จุดเชื่อมต่อ (integration points)**
+- `core/config.py`: `IDENTITY_HASH_SECRET` + ค่าคงที่ (MAX_SHARE, IP hub, เกณฑ์ธง) · `.env.example`
+- `models/`: ตารางใหม่ 3 ตาราง + คอลัมน์ใน `User` + export ใน `models/__init__.py`
+- `routers/auth.py` `register` / `login`: เก็บ `email_norm`, `device_id`, `ip` (ต้องเพิ่ม `request: Request`)
+- `services/youtube.py` `build_auth_url` (+`openid`) · `exchange_code` คืน `id_token` · `routers/youtube.py` `callback` อ่าน `sub`
+- `routers/submissions.py` `create_submission`: เช็กบัญชีรับเงิน (D8) + เก็บ `device_id`
+- `services/verification.py` `run_system_check`: จุดที่เปลี่ยนเป็น `under_review` → เรียกคิดคะแนนความเสี่ยง (ถูกเรียกทั้งจาก `create_submission` และ `refresh_views`)
+- `services/payout.py` `_demands`: เปลี่ยน key เป็น `profile_group_id`
+- `routers/payments.py` `withdraw` (พักถอน + เก็บสัญญาณ) · `get_wallet` / `WalletResponse` ต้องมีฟิลด์บอกว่าถูกพัก
+- `routers/review.py` `review_queue` + `schemas/submission.py::SubmissionForReview`
+- frontend: `lib/api.ts` (`X-Device-Id`), `lib/types.ts`, `lib/routes.ts`, `settings-view.tsx`, `submit-content-form.tsx` (ตอนนี้แสดง error เป็น `toast.error(err.message)`), `wallet-view.tsx` (ใช้ `can_withdraw`), `submissions-view.tsx`, `review-queue.tsx`, หน้าใหม่ `/admin/linked-accounts`
+- tests: `conftest.py::make_user` ต้องเพิ่มบัญชีรับเงินให้ creator · `seed.py` ให้ `creator@adcup.dev` มีบัญชีรับเงิน
+
+**จุดที่โค้ดจริงต่างจาก spec / ต้องระวัง**
+1. **ไม่มีรอบจ่ายรายวันอัตโนมัติ** รอบจ่ายเกิดเมื่อ admin กดเท่านั้น เหตุผลของ D8 ยังใช้ได้ (เงินออกในรอบถัดไปหลัง approve)
+2. **IP ในเครื่อง dev เป็นค่าเดียวกันหมด:** backend เห็นทุก request เป็น `172.20.0.1` (gateway ของ Docker network) และ compose ปัจจุบันไม่มี reverse proxy · ในเครื่อง dev IP จะกลายเป็น hub (เกิน 5 บัญชี) แล้วไม่นับคะแนนตาม D7 ซึ่งปลอดภัย แต่ทดสอบ IP ด้วยมือบนเว็บไม่ได้ (ทดสอบด้วย unit test แทน) · ไม่ควรเชื่อ `X-Forwarded-For` จนกว่าจะมี proxy จริงตอน deploy
+3. **route ถูกเรียกเป็นฟังก์ชันตรงๆ ในเทสต์** (`create_submission(body, creator, db)`) ถ้าเพิ่ม `request: Request` ต้องใส่เป็น optional ท้ายสุด ไม่อย่างนั้นเทสต์เดิมพัง
+4. **`callback` คืน `channel_taken` ก่อนบันทึกอะไร:** ถ้าจะเก็บ `google_sub` ต้องตัดสินใจว่าจะเก็บในกรณีนี้ด้วยไหม (ดู Q6)
+5. **ตัวเลขข้อ 10.3 ตรงกับโค้ดจริง:** ไม่จัดกลุ่ม: 7 คลิป × ฿1,500 = ฿10,500 > pool → คลิปละ ฿1,428.57 (เศษ 1 สตางค์ไปคลิปแรกตามลำดับ `approved_at`) รวม ฿10,000.00 พอดี · จัดกลุ่ม: กลุ่มต้น ฿6,000 → ฿3,000 → คลิปละ ฿750 · รวม ฿7,500 · คำว่า "ต้นได้รวมประมาณ ฿5,714.29" คือ #1 + #12 รวมกัน
+6. **Wallet:** spec ข้อ 8 ไม่มี API สำหรับสถานะพักถอน เสนอเพิ่มฟิลด์ `withdrawals_on_hold: bool` ใน `GET /api/wallet` และให้ `can_withdraw = false` เมื่อถูกพัก
 
 ---
 
@@ -420,10 +455,13 @@ group_id ของแต่ละกลุ่ม = id ที่น้อยท�
 | # | คำถาม | ค่าที่แนะนำ |
 |---|---|---|
 | Q1 | ~~ชื่อ branch~~ | **ตอบแล้ว:** `feature/linked-accounts` (branch เดียว, PR เดียวตอนจบ) |
-| Q2 | ปุ่ม **Reverse** (ดึงเงินคืน) ทำในรอบนี้ไหม ถ้าทำต้องเพิ่ม `TransactionType.adjustment` · ลด wallet ตาม net · คืน gross เข้า pool ของแคมเปญ | รอบแรกทำแค่ **Keep** (ปิดธง + ปลดพัก) ส่วน Reverse ไว้รอบหลัง |
-| Q3 | ค่าคงที่ `MAX_SHARE = 3`, เกณฑ์ IP hub 5, เกณฑ์ติดธง 50 คะแนน ยืนยันไหม | ตามนี้ (ใส่ใน `core/config.py`) |
-| Q4 | ข้อความ UI ที่เสนอในข้อ 9 ใช้ได้ไหม | ใช้ตามนี้ |
-| Q5 | เรื่องที่โค้ดจริงต่างจาก spec (ได้จาก Phase 0) | ถามตามที่เจอ |
+| Q2 | ปุ่ม **Reverse** (ดึงเงินคืน) ทำในรอบนี้ไหม ถ้าทำต้องเพิ่ม `TransactionType.adjustment` · ลด wallet ตาม net · คืน gross เข้า pool ของแคมเปญ | รอบแรกทำแค่ **Keep** (ปิดธง + ปลดพัก) ส่วน Reverse ไว้รอบหลัง · **ตอบแล้ว (2026-10-12): ตามที่แนะนำ** |
+| Q3 | ค่าคงที่ `MAX_SHARE = 3`, เกณฑ์ IP hub 5, เกณฑ์ติดธง 50 คะแนน ยืนยันไหม | ตามนี้ (ใส่ใน `core/config.py`) · **ตอบแล้ว (2026-10-12): ตามที่แนะนำ** |
+| Q4 | ข้อความ UI ที่เสนอในข้อ 9 ใช้ได้ไหม | ใช้ตามนี้ · **ตอบแล้ว (2026-10-12): ตามที่แนะนำ** |
+| Q5 | เรื่องที่โค้ดจริงต่างจาก spec (ได้จาก Phase 0) | **ตอบแล้ว (2026-10-12):** เจ้าของงานยืนยันรายงาน Phase 0 (ข้อ 2.3) และ Q6–Q8 |
+| Q6 | OAuth callback ที่จบด้วย `channel_taken` (ช่องนี้ผูกกับบัญชีอื่นแล้ว) ควรเก็บ `google_sub` ของผู้ที่พยายามผูกไหม | เก็บ: คนที่ login Google เดียวกับเจ้าของช่องได้ คือคนเดียวกันแน่นอน · **ตอบแล้ว (2026-10-12): ตามที่แนะนำ** |
+| Q7 | IP: ใช้ `request.client.host` อย่างเดียว ไม่เชื่อ `X-Forwarded-For` จนกว่าจะมี reverse proxy ตอน deploy | ตามนี้ · **ตอบแล้ว (2026-10-12): ตามที่แนะนำ** |
+| Q8 | Wallet: เพิ่ม `withdrawals_on_hold` ใน `GET /api/wallet` และให้ `can_withdraw = false` เมื่อถูกพัก | ตามนี้ · **ตอบแล้ว (2026-10-12): ตามที่แนะนำ** |
 
 ---
 
@@ -433,6 +471,7 @@ group_id ของแต่ละกลุ่ม = id ที่น้อยท�
 |---|---|---|---|
 | 2026-10-12 | เขียน spec (session วิเคราะห์เดิม) | ยังไม่เริ่ม | เริ่ม Phase 0 ใน repo ใหม่ |
 | 2026-10-12 | clone repo ลง `project_AdCup_101226` · สร้าง branch `feature/linked-accounts` จาก `main` (`ce0868a`) · commit spec นี้ · push branch | Phase 0 ยังไม่เริ่ม | session ใหม่: เริ่ม Phase 0 (ดู `START-HERE.md` ที่ root ของโฟลเดอร์) |
+| 2026-10-12 | Phase 0: สร้าง `.env` · `docker compose up -d --build` · baseline 46 passed · เขียนผลสำรวจข้อ 2.3 · เพิ่ม Q6–Q8 | Phase 0 เสร็จ รอเจ้าของงานยืนยัน | ตอบ Q2–Q8 แล้วเริ่ม Phase 1 |
 
 ---
 
