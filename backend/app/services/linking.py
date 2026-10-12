@@ -14,6 +14,9 @@ Hub rule (MAX_SHARE): one value shared by more than MAX_SHARE accounts gets a "h
 A Google account is then NOT used to merge (an agency may manage many creators' channels); a payout
 account and an email still merge (whoever receives the money is one profile).
 
+After a rebuild, groups that gained members are checked for an "overage": linked accounts that were
+already paid more than one cap per profile in a campaign before the link was known (spec 6.4).
+
 Callers manage their own db.commit(); this module only flushes.
 """
 
@@ -23,7 +26,9 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import MAX_SHARE
-from app.models.identity import IdentitySignal, LinkFlag, LinkFlagKind, ManualLink, SignalType
+from app.models.campaign import Campaign
+from app.models.identity import IdentitySignal, LinkFlag, LinkFlagKind, LinkFlagStatus, ManualLink, SignalType
+from app.models.submission import Submission
 from app.models.user import User, UserRole
 
 STRONG_SIGNALS = (SignalType.payout_account, SignalType.google_sub, SignalType.email_norm)
@@ -118,6 +123,49 @@ def rebuild_profile_groups(db: Session) -> set[int]:
             moves[new_group].append(user_id)
     for group_id, user_ids in moves.items():
         db.execute(update(User).where(User.id.in_(user_ids)).values(profile_group_id=group_id))
+    db.flush()
 
+    _flag_overages(db, set(moves))
     db.flush()
     return {user_id for user_ids in moves.values() for user_id in user_ids}
+
+
+def _flag_overages(db: Session, group_ids: set[int]) -> None:
+    """Spec 6.4: groups that just gained members may already have been paid more than cap_per_profile
+    in a campaign (each account was paid up to its own cap before they were linked).
+
+    Nothing is clawed back automatically (spec D10): the payout engine already pays the group 0 from
+    now on, and an open "overage" flag holds the group's withdrawals until an admin decides.
+    The flag points at the group through user_a_id (its smallest member when flagged).
+    """
+    if not group_ids:
+        return
+    paid = func.sum(Submission.gross_amount)
+    over_cap = db.execute(
+        select(User.profile_group_id, Submission.campaign_id, paid - Campaign.cap_per_profile)
+        .join(Submission, Submission.creator_id == User.id)
+        .join(Campaign, Campaign.id == Submission.campaign_id)
+        .where(User.profile_group_id.in_(group_ids), Campaign.cap_per_profile.is_not(None))
+        .group_by(User.profile_group_id, Submission.campaign_id, Campaign.cap_per_profile)
+        .having(paid > Campaign.cap_per_profile)
+    ).all()
+
+    for group_id, campaign_id, excess in over_cap:
+        members = select(User.id).where(User.profile_group_id == group_id)
+        flag = db.scalar(
+            select(LinkFlag)
+            .where(
+                LinkFlag.kind == LinkFlagKind.overage,
+                LinkFlag.campaign_id == campaign_id,
+                LinkFlag.user_a_id.in_(members),
+            )
+            .order_by(LinkFlag.id.desc())
+        )
+        if flag is not None and flag.status == LinkFlagStatus.open:
+            flag.amount = excess  # the group grew again before an admin looked at it
+        elif flag is None or excess > flag.amount:  # decided before: only a bigger overage is news
+            db.add(
+                LinkFlag(
+                    kind=LinkFlagKind.overage, user_a_id=group_id, campaign_id=campaign_id, amount=excess, reasons=[]
+                )
+            )
