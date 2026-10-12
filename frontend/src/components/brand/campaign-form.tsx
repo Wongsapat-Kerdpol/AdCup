@@ -23,7 +23,7 @@ import { cn, formatNumber, formatTHB } from "@/lib/utils";
 
 const DEFAULT_MIN_VIEWS = 1000; // backend/app/core/config.py
 const SUPPORTED_PLATFORMS: Platform[] = ["youtube", "tiktok"]; // SUPPORTED_SUBMISSION_PLATFORMS
-const ALL_PLATFORMS: Platform[] = ["youtube", "tiktok", "instagram", "x"];
+const ALL_PLATFORMS: Platform[] = ["youtube", "tiktok"];
 const MONEY_RE = /^\d+(\.\d{1,2})?$/;
 
 type Values = {

@@ -40,7 +40,7 @@
 
 - Content creator can connect their YouTube account through Google OAuth to verify ownership; the app then pulls real view counts for videos they submit through the YouTube Data API.
 
-- Content creator can submit one or more videos per campaign (each submission is tracked separately). YouTube is supported first; TikTok and Instagram are planned once YouTube works end-to-end.
+- Content creator can submit one or more videos per campaign (each submission is tracked separately). YouTube and TikTok are supported.
 
 - Each submission goes through a two-stage review. **Round 1 — System check (automatic):** the video must exist and be public, belong to the creator's connected YouTube channel, be published after the campaign started, not be a duplicate, and reach the campaign's minimum views (default 1,000 views; a video below the minimum waits and is re-checked as views grow). **Round 2 — Admin review:** an admin watches the video and checks it against the brand's content requirements (e.g. "the water bottle must be visible"), then approves or rejects it with a reason. A submission that is not approved never generates a payout.
 

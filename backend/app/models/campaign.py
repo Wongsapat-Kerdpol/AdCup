@@ -25,11 +25,9 @@ class CampaignStatus(str, enum.Enum):
 
 
 class Platform(str, enum.Enum):
-    # Only YouTube submissions are verified for now; TikTok/IG come later.
+    # AdCup supports YouTube and TikTok only.
     youtube = "youtube"
     tiktok = "tiktok"
-    instagram = "instagram"
-    x = "x"
 
 
 class Campaign(Base):

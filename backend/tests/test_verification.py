@@ -15,7 +15,7 @@ def _connect_channel(creator, channel_id: str = "channel-1"):
 def test_rejects_unsupported_platform(db, make_campaign, make_user, make_submission):
     creator = make_user(UserRole.creator)
     campaign = make_campaign()
-    submission = make_submission(campaign, creator, platform="x")  # tiktok is supported now (Person 3)
+    submission = make_submission(campaign, creator, platform="vimeo")  # not a platform AdCup supports
 
     run_system_check(db, submission)
 

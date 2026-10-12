@@ -51,7 +51,7 @@ settings = get_settings()
 COMMISSION_RATE = Decimal("0.10")  # flat 10% platform commission on every payout
 MIN_WITHDRAWAL_THB = Decimal("1500.00")  # creator can withdraw once balance >= this
 DEFAULT_MIN_VIEWS = 1000  # round-1 system check: minimum views before admin review (per-campaign override)
-SUPPORTED_SUBMISSION_PLATFORMS = ("youtube", "tiktok")  # add "instagram" once its adapter exists
+SUPPORTED_SUBMISSION_PLATFORMS = ("youtube", "tiktok")
 CURRENCY = "THB"
 
 # Duplicate-clip checker (services/duplicate_check.py). Distances are Hamming distances out of 64 bits.

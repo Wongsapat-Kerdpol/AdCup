@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/campaigns", tags=["campaigns"])
 @router.get("", response_model=CampaignListResponse)
 def list_campaigns(
     category: CampaignCategory | None = None,
-    platform: str | None = Query(None, description="youtube | tiktok | instagram | x"),
+    platform: str | None = Query(None, description="youtube | tiktok"),
     search: str | None = Query(None, max_length=100),
     sort: CampaignSort = CampaignSort.newest,
     status: CampaignStatus | None = Query(CampaignStatus.active),

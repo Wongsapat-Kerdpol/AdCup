@@ -28,7 +28,7 @@ const categories: { value: CampaignCategory | "all"; label: string }[] = [
   { value: "ugc", label: "UGC" },
 ];
 
-const platforms: Platform[] = ["youtube", "tiktok", "instagram", "x"];
+const platforms: Platform[] = ["youtube", "tiktok"];
 
 const sortOptions: { value: CampaignSort; label: string }[] = [
   { value: "newest", label: "Newest" },

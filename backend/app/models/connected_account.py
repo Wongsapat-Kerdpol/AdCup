@@ -8,7 +8,7 @@ from app.core.database import Base
 
 class ConnectedAccount(Base):
     """A creator's linked account on a platform whose stats need the creator's own OAuth token
-    (TikTok, Instagram). YouTube stays on User.youtube_* because its stats come from an API key.
+    (TikTok). YouTube stays on User.youtube_* because its stats come from an API key.
 
     A new table, so `create_all` adds it to existing databases — no reset needed (Person 3).
     Tokens must never be sent to the frontend.
@@ -23,7 +23,7 @@ class ConnectedAccount(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    platform: Mapped[str] = mapped_column(String(20))  # "tiktok", "instagram"
+    platform: Mapped[str] = mapped_column(String(20))  # "tiktok"
     account_id: Mapped[str] = mapped_column(String(100))  # the platform's stable user id
     username: Mapped[str | None] = mapped_column(String(255))  # display only
 

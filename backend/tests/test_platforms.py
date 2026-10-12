@@ -60,7 +60,7 @@ def test_campaign_must_accept_the_platform(db, make_campaign, make_user, make_su
 
 def test_submit_rejects_platform_the_campaign_does_not_accept(db, make_campaign, make_user):
     creator = make_user(UserRole.creator, youtube_channel_id="channel-1")
-    campaign = make_campaign(platforms=["instagram"])
+    campaign = make_campaign(platforms=["tiktok"])
 
     with pytest.raises(HTTPException) as exc:
         create_submission(SubmissionCreate(campaign_id=campaign.id, video_url="https://youtu.be/xyz12345678"), creator, db)
@@ -77,7 +77,7 @@ def test_submit_unrecognised_link(db, make_campaign, make_user):
     assert "Could not recognize" in exc.value.detail
 
 
-# --- A platform whose stats need the creator's own login (how TikTok / Instagram will work) ---
+# --- A platform whose stats need the creator's own login (how TikTok works) ---
 
 
 class TokenPlatform:

@@ -37,7 +37,7 @@ export interface TokenResponse {
 
 export type CampaignCategory = "logo" | "music" | "clipping" | "ugc";
 export type CampaignStatus = "draft" | "active" | "paused" | "completed";
-export type Platform = "youtube" | "tiktok" | "instagram" | "x";
+export type Platform = "youtube" | "tiktok";
 export type CampaignSort =
   | "newest"
   | "highest_rate"

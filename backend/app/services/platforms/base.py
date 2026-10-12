@@ -32,7 +32,7 @@ class PlatformAdapter(Protocol):
     name: str  # stored in Submission.platform / Campaign.platforms, e.g. "youtube"
     label: str  # "YouTube"
     account_label: str  # "YouTube channel" — used in messages like "Connect your YouTube channel"
-    # True when stats can only be read with the creator's own OAuth token (TikTok, Instagram).
+    # True when stats can only be read with the creator's own OAuth token (TikTok).
     # False when a server-side API key is enough (YouTube).
     stats_need_user_token: bool
 

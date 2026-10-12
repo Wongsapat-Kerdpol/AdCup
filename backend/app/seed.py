@@ -28,22 +28,22 @@ USERS = [
 
 # title, category, platforms, rate THB / 1K views, budget THB, paid-out fraction, days left, brand index
 CAMPAIGNS = [
-    ("Siam Coffee — Morning Ritual [UGC]", "ugc", ["tiktok", "instagram"], 25, 50000, 0.42, 21, 0),
+    ("Siam Coffee — Morning Ritual [UGC]", "ugc", ["tiktok"], 25, 50000, 0.42, 21, 0),
     ("Neon Records — Midnight Drive [EDITS]", "music", ["tiktok", "youtube"], 70, 84000, 0.88, 6, 1),
     ("Thai Street Food Tour [CLIPPING]", "clipping", ["youtube", "tiktok"], 35, 60000, 0.28, 30, 0),
-    ("Siam Coffee Logo Placement", "logo", ["youtube", "tiktok", "instagram"], 4.5, 105000, 0.17, 45, 0),
+    ("Siam Coffee Logo Placement", "logo", ["youtube", "tiktok"], 4.5, 105000, 0.17, 45, 0),
     ("Lo-fi Bangkok Nights [MUSIC]", "music", ["tiktok"], 35, 28000, 0.55, 12, 1),
-    ("Esports Highlights — CS2 [LOGO]", "logo", ["youtube", "x"], 3.5, 245000, 0.18, 60, 1),
-    ("Skincare Honest Review [UGC]", "ugc", ["tiktok", "instagram"], 30, 40000, 0.04, 25, 0),
-    ("Podcast Best Moments [CLIPPING]", "clipping", ["youtube", "tiktok", "instagram"], 28, 70000, 0.89, 4, 1),
-    ("Neon Records — Hold Me [EDITS]", "music", ["tiktok", "instagram"], 35, 56000, 0.12, 18, 1),
+    ("Esports Highlights — CS2 [LOGO]", "logo", ["youtube"], 3.5, 245000, 0.18, 60, 1),
+    ("Skincare Honest Review [UGC]", "ugc", ["tiktok"], 30, 40000, 0.04, 25, 0),
+    ("Podcast Best Moments [CLIPPING]", "clipping", ["youtube", "tiktok"], 28, 70000, 0.89, 4, 1),
+    ("Neon Records — Hold Me [EDITS]", "music", ["tiktok"], 35, 56000, 0.12, 18, 1),
     ("Muay Thai Gym Promo [UGC]", "ugc", ["youtube", "tiktok"], 20, 35000, 0.0, 40, 0),
     ("Tech Unboxing Shorts [CLIPPING]", "clipping", ["youtube"], 40, 120000, 0.65, 15, 0),
-    ("Streetwear Drop Lookbook [LOGO]", "logo", ["instagram", "tiktok"], 5, 90000, 0.31, 28, 1),
+    ("Streetwear Drop Lookbook [LOGO]", "logo", ["tiktok"], 5, 90000, 0.31, 28, 1),
     ("Chill Study Beats [MUSIC]", "music", ["youtube", "tiktok"], 24.5, 21000, 0.97, 2, 1),
-    ("Healthy Meal Prep Challenge [UGC]", "ugc", ["tiktok", "instagram", "youtube"], 22, 45000, 0.23, 35, 0),
-    ("Stand-up Comedy Clips [CLIPPING]", "clipping", ["tiktok", "x"], 30, 52000, 0.47, 22, 1),
-    ("Island Travel Vlog [UGC]", "ugc", ["youtube", "instagram"], 26, 64000, 0.08, 50, 0),
+    ("Healthy Meal Prep Challenge [UGC]", "ugc", ["tiktok", "youtube"], 22, 45000, 0.23, 35, 0),
+    ("Stand-up Comedy Clips [CLIPPING]", "clipping", ["tiktok"], 30, 52000, 0.47, 22, 1),
+    ("Island Travel Vlog [UGC]", "ugc", ["youtube"], 26, 64000, 0.08, 50, 0),
 ]
 
 
