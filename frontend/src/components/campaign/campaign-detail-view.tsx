@@ -229,7 +229,13 @@ function CreatorPanel({ campaign }: { campaign: CampaignDetail; user: User }) {
         {ready.map((p, i) => (
           <span key={p.name}>
             {i > 0 && " or "}
-            your {p.label} <span className="text-foreground">{p.account_name}</span>
+            your {p.label}
+            {p.account_name && (
+              <>
+                {" "}
+                <span className="text-foreground">{p.account_name}</span>
+              </>
+            )}
           </span>
         ))}
         , then paste the link.
@@ -245,7 +251,7 @@ function CreatorPanel({ campaign }: { campaign: CampaignDetail; user: User }) {
       )}
       <SubmitContentForm
         campaignId={campaign.id}
-        platforms={ready.map((p) => p.name)}
+        platforms={campaign.platforms}
         onSubmitted={() => setSubmitted(true)}
       />
       {submitted && (
