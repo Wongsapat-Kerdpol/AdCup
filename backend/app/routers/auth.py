@@ -19,6 +19,7 @@ from app.models.identity import SignalType
 from app.models.user import User
 from app.schemas.user import DevLoginRequest, LoginRequest, RegisterRequest, TokenResponse, UserPublic
 from app.services.identity import normalize_email, record_request_signals, record_signal
+from app.services.linking import rebuild_profile_groups
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -61,7 +62,8 @@ def register(body: RegisterRequest, db: Session = Depends(get_db), request: Requ
     db.refresh(user)
 
     # Linked account detection (services/identity.py); creators only.
-    record_signal(db, user, SignalType.email_norm, normalize_email(user.email))
+    if record_signal(db, user, SignalType.email_norm, normalize_email(user.email)):
+        rebuild_profile_groups(db)
     record_request_signals(db, user, request)
     db.commit()
     return TokenResponse(access_token=create_access_token(user.id, user.role.value), user=user)

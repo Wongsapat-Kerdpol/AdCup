@@ -38,6 +38,7 @@ from app.schemas.user import UserPublic
 from app.schemas.youtube import ConnectResponse, RefreshAllResult, RefreshResult
 from app.services import youtube as yt
 from app.services.identity import record_signal
+from app.services.linking import rebuild_profile_groups
 from app.services.payout import settle_all
 
 router = APIRouter(prefix="/api/youtube", tags=["youtube (Person 3)"])
@@ -102,8 +103,8 @@ def callback(
     # Linked account detection: recorded even when the channel is missing or taken below — signing in
     # to the Google account that owns another account's channel proves it is the same person.
     google_sub = yt.google_sub_from(tokens)
-    if google_sub:
-        record_signal(db, user, SignalType.google_sub, google_sub)
+    if google_sub and record_signal(db, user, SignalType.google_sub, google_sub):
+        rebuild_profile_groups(db)
         db.commit()
 
     if channel is None:

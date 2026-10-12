@@ -45,3 +45,6 @@ MIN_WITHDRAWAL_THB = Decimal("1500.00")  # creator can withdraw once balance >= 
 DEFAULT_MIN_VIEWS = 1000  # round-1 system check: minimum views before admin review (per-campaign override)
 SUPPORTED_SUBMISSION_PLATFORMS = ("youtube",)  # add "tiktok", "instagram" once their APIs are integrated
 CURRENCY = "THB"
+
+# --- Linked account detection (docs/linked-account-detection-spec.md) ---
+MAX_SHARE = 3  # a strong signal shared by more accounts than this is a "hub" (agency, mule account): flagged
