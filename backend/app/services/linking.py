@@ -22,7 +22,7 @@ Callers manage their own db.commit(); this module only flushes.
 
 from collections import defaultdict
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import MAX_SHARE
@@ -75,13 +75,9 @@ def rebuild_profile_groups(db: Session) -> set[int]:
     """Recompute every creator's profile_group_id. Returns the ids of the users whose group changed."""
     db.execute(select(func.pg_advisory_xact_lock(_REBUILD_LOCK)))  # released at commit / rollback
 
-    current: dict[int, int | None] = {
-        user_id: group_id
-        for user_id, group_id in db.execute(
-            select(User.id, User.profile_group_id).where(User.role == UserRole.creator)
-        )
-    }
-    dsu = DSU(current)
+    # Loaded as objects (not a bulk UPDATE) so accounts the caller already holds see their new group.
+    creators = {u.id: u for u in db.scalars(select(User).where(User.role == UserRole.creator))}
+    dsu = DSU(creators)
 
     # Who shares each strong value. Only creators are nodes (spec D18).
     sharing: dict[tuple[SignalType, str], list[int]] = defaultdict(list)
@@ -108,26 +104,27 @@ def rebuild_profile_groups(db: Session) -> set[int]:
             dsu.union(users[0], user_id)
 
     for a, b in db.execute(select(ManualLink.user_a_id, ManualLink.user_b_id)):
-        if a in current and b in current:
+        if a in creators and b in creators:
             dsu.union(a, b)
 
     smallest: dict[int, int] = {}
-    for user_id in current:
+    for user_id in creators:
         root = dsu.find(user_id)
         smallest[root] = min(smallest.get(root, user_id), user_id)
 
-    moves: dict[int, list[int]] = defaultdict(list)  # new group id -> users moving into it
-    for user_id, old_group in current.items():
+    changed: set[int] = set()
+    gained: set[int] = set()  # groups that got a new member
+    for user_id, user in creators.items():
         new_group = smallest[dsu.find(user_id)]
-        if new_group != old_group:
-            moves[new_group].append(user_id)
-    for group_id, user_ids in moves.items():
-        db.execute(update(User).where(User.id.in_(user_ids)).values(profile_group_id=group_id))
+        if new_group != user.profile_group_id:
+            user.profile_group_id = new_group
+            changed.add(user_id)
+            gained.add(new_group)
     db.flush()
 
-    _flag_overages(db, set(moves))
+    _flag_overages(db, gained)
     db.flush()
-    return {user_id for user_ids in moves.values() for user_id in user_ids}
+    return changed
 
 
 def _flag_overages(db: Session, group_ids: set[int]) -> None:

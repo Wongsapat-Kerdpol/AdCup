@@ -1,6 +1,7 @@
 """[PERSON 3] Google OAuth + YouTube view refresh.
 
-  GET  /api/youtube/connect                 — creator: returns the Google consent URL (scope: openid youtube.readonly).
+  GET  /api/youtube/connect                 — creator: returns the Google consent URL
+                                               (scope: openid youtube.readonly).
                                                JSON instead of a 302 because the browser can't attach
                                                the JWT to a plain navigation; the frontend redirects.
   GET  /api/youtube/callback                — Google redirects here: exchange code, record the Google account id
