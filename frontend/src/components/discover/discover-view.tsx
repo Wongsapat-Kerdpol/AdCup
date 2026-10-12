@@ -122,52 +122,21 @@ export function DiscoverView() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        {/* Platform filter */}
-        <div className="flex w-fit items-center gap-1 rounded-lg border bg-card p-1">
-          <FilterChip active={!platform} onClick={() => setParam("platform", null)}>
-            All platforms
-          </FilterChip>
-          {platforms.map((p) => (
-            <FilterChip
-              key={p}
-              active={platform === p}
-              onClick={() => setParam("platform", platform === p ? null : p)}
-              title={platformLabels[p]}
-            >
-              <PlatformIcon platform={p} />
-            </FilterChip>
-          ))}
-        </div>
-
-        {/* Category filter */}
-        <div className="flex items-center gap-1 overflow-x-auto">
-          {categories.map((c) => (
-            <FilterChip
-              key={c.value}
-              variant="underline"
-              active={category === c.value}
-              onClick={() => setParam("category", c.value === "all" ? null : c.value)}
-            >
-              {c.label}
-            </FilterChip>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2 lg:ml-auto">
-          <div className="relative flex-1 lg:w-64 lg:flex-none">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+    <div className="min-w-0 space-y-4">
+      <div className="space-y-3 rounded-lg border bg-card p-3">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search for a campaign..."
-              className="pl-9"
+              placeholder="Search campaigns, brands…"
+              className="h-10 rounded-full pl-10"
               aria-label="Search campaigns"
             />
           </div>
           <Select value={sort} onValueChange={(v) => setParam("sort", v === "newest" ? null : v)}>
-            <SelectTrigger className="w-44" aria-label="Sort by">
+            <SelectTrigger className="h-10 w-full rounded-full sm:w-48" aria-label="Sort by">
               <SelectValue />
             </SelectTrigger>
             <SelectContent align="end">
@@ -179,28 +148,55 @@ export function DiscoverView() {
             </SelectContent>
           </Select>
         </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Category filter */}
+          {categories.map((c) => (
+            <FilterChip
+              key={c.value}
+              active={category === c.value}
+              onClick={() => setParam("category", c.value === "all" ? null : c.value)}
+            >
+              {c.label}
+            </FilterChip>
+          ))}
+
+          <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+
+          {/* Platform filter */}
+          {platforms.map((p) => (
+            <FilterChip
+              key={p}
+              active={platform === p}
+              onClick={() => setParam("platform", platform === p ? null : p)}
+              title={platformLabels[p]}
+            >
+              <PlatformIcon platform={p} /> {platformLabels[p]}
+            </FilterChip>
+          ))}
+        </div>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        Showing <span className="font-semibold text-foreground">{loading ? "…" : items.length}</span> of{" "}
-        <span className="font-semibold text-foreground">{loading ? "…" : total}</span> campaigns
+      <p className="text-sm text-muted-foreground">
+        <span className="font-semibold text-foreground">{loading ? "…" : total}</span> campaigns available
+        {!loading && items.length < total && <> · showing {items.length}</>}
       </p>
 
       {loading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-[138px] rounded-xl" />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-[300px] rounded-lg" />
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed py-16 text-center">
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed bg-card py-16 text-center">
           <SearchX className="size-8 text-muted-foreground" />
-          <p className="font-medium">No campaigns found</p>
+          <p className="font-semibold">No campaigns found</p>
           <p className="text-sm text-muted-foreground">Try a different search or filter.</p>
         </div>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {items.map((c) => (
               <CampaignCard key={c.id} campaign={c} />
             ))}
@@ -218,24 +214,16 @@ export function DiscoverView() {
   );
 }
 
-function FilterChip({
-  active,
-  variant = "pill",
-  className,
-  ...props
-}: React.ComponentProps<"button"> & { active: boolean; variant?: "pill" | "underline" }) {
+function FilterChip({ active, className, ...props }: React.ComponentProps<"button"> & { active: boolean }) {
   return (
     <button
       type="button"
       aria-pressed={active}
       className={cn(
-        "flex h-8 items-center justify-center rounded-md px-3 text-sm whitespace-nowrap transition-colors",
-        variant === "pill" &&
-          (active ? "border border-primary/60 bg-primary/15 text-foreground" : "text-muted-foreground hover:bg-accent"),
-        variant === "underline" &&
-          (active
-            ? "rounded-none border-b-2 border-foreground text-foreground"
-            : "text-muted-foreground hover:text-foreground"),
+        "flex h-8 items-center justify-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold whitespace-nowrap transition-colors",
+        active
+          ? "border-foreground bg-foreground text-background"
+          : "border-input bg-card text-muted-foreground hover:border-foreground/40 hover:text-foreground",
         className,
       )}
       {...props}

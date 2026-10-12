@@ -206,14 +206,14 @@ function SubmissionCard({
           </div>
           <div>
             <dt className="text-muted-foreground">Earned (net)</dt>
-            <dd className={cn("font-medium", toNumber(s.net_amount) > 0 && "text-green-400")}>
+            <dd className={cn("font-medium", toNumber(s.net_amount) > 0 && "text-green-700")}>
               {formatTHB(s.net_amount)}
             </dd>
           </div>
           {s.profile_cap_reached && (
             <div>
               <dt className="text-muted-foreground">Earnings</dt>
-              <dd className="font-medium text-amber-400">Cap per profile reached</dd>
+              <dd className="font-medium text-amber-700">Cap per profile reached</dd>
             </div>
           )}
         </dl>

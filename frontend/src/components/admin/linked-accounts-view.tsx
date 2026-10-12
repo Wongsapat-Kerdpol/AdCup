@@ -178,7 +178,7 @@ function FlagCard({
       )}
     >
       <div className="flex items-start gap-2">
-        <Icon className={cn("mt-0.5 size-4 shrink-0", amber ? "text-amber-400" : "text-rose-400")} />
+        <Icon className={cn("mt-0.5 size-4 shrink-0", amber ? "text-amber-700" : "text-rose-600")} />
         <div className="text-sm font-medium">{title}</div>
       </div>
       <div className="space-y-2 text-sm">{children}</div>
@@ -233,7 +233,7 @@ function SuspectedCard({ flag, busy, act }: CardProps) {
             return (
               <tr key={check}>
                 <td className="py-1.5 text-muted-foreground">{signalLabel(check)}</td>
-                <td className={cn("py-1.5 text-right font-medium", same ? "text-amber-400" : "text-muted-foreground")}>
+                <td className={cn("py-1.5 text-right font-medium", same ? "text-amber-700" : "text-muted-foreground")}>
                   {same ? "Same" : "Different"}
                 </td>
               </tr>
@@ -325,7 +325,7 @@ function Figure({ label, value, strong }: { label: string; value: string | null;
   return (
     <div className="rounded-lg bg-muted/40 p-2">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className={strong ? "font-semibold text-rose-400" : "font-medium"}>{value ? formatTHB(value) : "—"}</dd>
+      <dd className={strong ? "font-semibold text-rose-600" : "font-medium"}>{value ? formatTHB(value) : "—"}</dd>
     </div>
   );
 }

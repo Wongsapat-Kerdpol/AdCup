@@ -61,9 +61,9 @@ function linkHint(url: string, accepted: Platform[], statuses: PlatformStatus[] 
 }
 
 const toneStyle = {
-  ok: { icon: CheckCircle2, cls: "text-green-400" },
-  warn: { icon: AlertTriangle, cls: "text-amber-400" },
-  error: { icon: XCircle, cls: "text-red-400" },
+  ok: { icon: CheckCircle2, cls: "text-green-700" },
+  warn: { icon: AlertTriangle, cls: "text-amber-700" },
+  error: { icon: XCircle, cls: "text-red-600" },
 } as const;
 
 export function SubmitContentForm({

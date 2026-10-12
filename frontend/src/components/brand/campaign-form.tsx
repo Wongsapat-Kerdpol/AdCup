@@ -284,7 +284,7 @@ export function CampaignForm({ campaign }: { campaign?: CampaignDetail }) {
               label="Thumbnail URL"
               htmlFor="thumbnail_url"
               error={errors.thumbnail_url}
-              hint="Optional. Without one, the card shows the category artwork."
+              hint="Optional. Without one, the card shows a plain color."
             >
               <Input {...bind("thumbnail_url")} placeholder="https://…/cover.jpg" maxLength={500} />
             </FormField>

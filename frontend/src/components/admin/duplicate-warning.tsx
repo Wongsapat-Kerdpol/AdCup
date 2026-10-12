@@ -20,13 +20,13 @@ const levelStyle = {
     icon: ShieldAlert,
     title: "Probably a copy",
     box: "border-destructive/50 bg-destructive/10",
-    text: "text-red-400",
+    text: "text-red-600",
   },
   check: {
     icon: AlertTriangle,
     title: "Should check",
     box: "border-amber-500/40 bg-amber-500/10",
-    text: "text-amber-400",
+    text: "text-amber-700",
   },
 } as const;
 
@@ -65,7 +65,7 @@ export function DuplicateWarning({ submissionId }: { submissionId: number }) {
   if (report.level === null) {
     return (
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <ShieldCheck className="size-3.5 text-green-400" /> No similar clips found ({report.pictures_checked} pictures
+        <ShieldCheck className="size-3.5 text-green-700" /> No similar clips found ({report.pictures_checked} pictures
         checked)
       </p>
     );

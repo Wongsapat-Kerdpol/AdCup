@@ -1,37 +1,49 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
-import { Megaphone } from "lucide-react";
 
+import { DiscoverSidebar } from "@/components/discover/discover-sidebar";
 import { DiscoverView } from "@/components/discover/discover-view";
 import { routes } from "@/lib/routes";
 
 export const metadata: Metadata = { title: "Discover Campaigns" };
 
+const quickLinks = [
+  { label: "Logo placement", category: "logo" },
+  { label: "Music", category: "music" },
+  { label: "Clipping", category: "clipping" },
+  { label: "UGC", category: "ugc" },
+];
+
 export default function DiscoverPage() {
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 rounded-xl border border-primary/25 bg-gradient-to-r from-primary/15 via-card to-card p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3">
-          <Megaphone className="mt-0.5 size-5 shrink-0 text-primary" />
-          <div>
-            <p className="text-sm font-semibold">Get paid for the views you drive</p>
-            <p className="text-xs text-muted-foreground">
-              Pick a campaign, post an original video, submit the link. Approved posts earn from the pool — everyone is paid
-              together, and if the pool runs short everyone gets the same share.
-            </p>
-          </div>
+      <section className="rounded-xl bg-[#0e3b25] px-6 py-8 text-white sm:px-10 sm:py-10">
+        <h1 className="max-w-3xl text-3xl leading-tight font-bold text-balance sm:text-4xl">
+          Get paid for the views your videos bring in
+        </h1>
+        <p className="mt-2 max-w-xl text-sm text-white/75 sm:text-base">
+          Pick a campaign, post an original video, submit the link — approved posts earn from the brand&apos;s pool.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-2">
+          {quickLinks.map((q) => (
+            <Link
+              key={q.category}
+              href={`${routes.discover}?category=${q.category}`}
+              className="rounded-full border border-white/30 px-3.5 py-1.5 text-sm font-semibold transition-colors hover:bg-white hover:text-[#0e3b25]"
+            >
+              {q.label}
+            </Link>
+          ))}
         </div>
-        <Link href={`${routes.register}?role=creator`} className="text-sm font-medium text-primary hover:underline">
-          Start earning →
-        </Link>
+      </section>
+
+      <div className="grid items-start gap-6 lg:grid-cols-[1fr_300px]">
+        <Suspense>
+          <DiscoverView />
+        </Suspense>
+        <DiscoverSidebar />
       </div>
-
-      <h1 className="text-2xl font-bold tracking-tight">Discover</h1>
-
-      <Suspense>
-        <DiscoverView />
-      </Suspense>
     </div>
   );
 }
