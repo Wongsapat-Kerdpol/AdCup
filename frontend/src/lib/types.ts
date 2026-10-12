@@ -127,12 +127,58 @@ export interface Submission {
   net_amount: string;
   paid_views: number;
   created_at: string;
+  profile_cap_reached: boolean; // GET /api/submissions/mine only
 }
 
 export interface SubmissionForReview extends Submission {
   campaign_title: string;
   campaign_requirements: string;
   creator_name: string;
+  // Linked account detection: other accounts of the same person in this campaign, and open flags.
+  linked_accounts: { user_id: number; display_name: string; matched: string[] }[];
+  group_gross_in_campaign: string;
+  cap_per_profile: string | null;
+  open_flags: {
+    id: number;
+    kind: LinkFlagKind;
+    reasons: string[];
+    score: number | null;
+    amount: string | null;
+    other_user_id: number | null;
+    other_display_name: string | null;
+  }[];
+}
+
+// Linked account detection — admin (GET /api/admin/links, POST /api/admin/link-flags/{id}/*).
+// Only signal TYPES are ever returned, never the values.
+export type LinkFlagKind = "suspected" | "hub" | "overage";
+export type LinkFlagStatus = "open" | "confirmed" | "dismissed" | "resolved";
+export type SignalType = "payout_account" | "google_sub" | "email_norm" | "device_id" | "ip";
+
+export interface LinkedUser {
+  id: number;
+  display_name: string;
+}
+
+export interface LinkFlag {
+  id: number;
+  kind: LinkFlagKind;
+  status: LinkFlagStatus;
+  created_at: string;
+  users: LinkedUser[];
+  reasons: string[];
+  score: number | null;
+  signal_type: SignalType | null;
+  campaign_id: number | null;
+  campaign_title: string | null;
+  amount: string | null;
+  group_gross: string | null;
+  cap_per_profile: string | null;
+}
+
+export interface LinksResponse {
+  flags: LinkFlag[];
+  groups: { group_id: number; members: LinkedUser[]; matched: string[] }[];
 }
 
 // Person 3 — mock checkout (POST /api/payments/checkout/{id})
@@ -172,6 +218,7 @@ export interface Wallet {
   balance: string;
   min_withdrawal: string;
   can_withdraw: boolean;
+  withdrawals_on_hold: boolean; // linked account detection: an admin is reviewing the account
   total_earned: string;
   total_commission: string;
   total_withdrawn: string;

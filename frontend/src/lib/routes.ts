@@ -18,6 +18,7 @@ export const routes = {
   settings: "/settings", // Person 3 (YouTube connect)
   admin: "/admin", // Person 3 (analytics)
   adminReview: "/admin/review", // Person 2 (round-2 review queue)
+  adminLinkedAccounts: "/admin/linked-accounts", // linked account detection (guarded by the /admin prefix)
 } as const;
 
 /** Path prefixes that require login, and optionally a specific role. First match wins. */
@@ -50,6 +51,7 @@ export const navByRole: Record<UserRole | "guest", { href: string; label: string
   admin: [
     { href: routes.discover, label: "Discover" },
     { href: routes.adminReview, label: "Review Queue" },
+    { href: routes.adminLinkedAccounts, label: "Linked Accounts" },
     { href: routes.admin, label: "Analytics" },
   ],
 };
