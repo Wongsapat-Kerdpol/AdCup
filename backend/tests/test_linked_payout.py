@@ -10,6 +10,7 @@ from app.models.identity import LinkFlag, LinkFlagKind, LinkFlagStatus, SignalTy
 from app.models.submission import SubmissionStatus
 from app.models.user import PayoutMethod
 from app.routers.payout_method import set_payout_method
+from app.routers.submissions import my_submissions
 from app.schemas.payout_method import PayoutMethodUpdate
 from app.services.identity import record_signal
 from app.services.linking import rebuild_profile_groups
@@ -105,6 +106,24 @@ def test_account_without_a_group_counts_as_its_own_profile(db, make_campaign, ma
 
     settle_campaign(db, campaign.id)
     assert campaign.paid_out == Decimal("1.00")
+
+
+def test_my_submissions_says_cap_per_profile_reached_without_naming_the_link(
+    db, make_campaign, make_user, make_submission
+):
+    campaign = make_campaign(rate_per_1k_views=Decimal("1.00"), cap_per_profile=Decimal("4.00"))
+    ton, shorts, other = make_user(), make_user(), make_user()
+    _link(db, ton, shorts)
+    approved(make_submission, campaign, ton, 3000)
+    approved(make_submission, campaign, shorts, 3000)
+    approved(make_submission, campaign, other, 3000)
+    settle_campaign(db, campaign.id)  # the group earns ฿4 (its cap) from ฿6 of views; other earns ฿3
+
+    (mine,) = my_submissions(shorts, db)
+    assert mine.profile_cap_reached is True
+    assert mine.model_dump().keys().isdisjoint({"profile_group_id", "linked_accounts"})
+    (theirs,) = my_submissions(other, db)
+    assert theirs.profile_cap_reached is False
 
 
 # --- overage (spec 6.4, S6) ---

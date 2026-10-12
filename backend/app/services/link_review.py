@@ -5,6 +5,7 @@ withdrawals_on_hold(db, user)  -> an open flag involves the user's profile group
                                   "suspected" or "overage" naming a member, or a "hub" flag on a payout
                                   account a member uses (possible mule account). Hubs of a Google account
                                   or an email only alert admins (spec D6) and don't hold anything.
+capped_campaigns(db, user)     -> campaigns where the user's group has used its cap per profile (My Submissions).
 review_info(db, submission)    -> the extra fields of the admin review queue (computed when read, 5.5).
 
 Admins see which TYPES of signal matched, never the values (spec D14).
@@ -73,6 +74,22 @@ def group_gross(db: Session, member_ids: list[int], campaign_id: int) -> Decimal
         select(func.coalesce(func.sum(Submission.gross_amount), 0)).where(
             Submission.creator_id.in_(member_ids), Submission.campaign_id == campaign_id
         )
+    )
+
+
+def capped_campaigns(db: Session, user: User) -> set[int]:
+    """Campaigns where the user's profile group has been paid its whole cap per profile. The creator only
+    sees "Cap per profile reached", never that other accounts count towards it (spec D16)."""
+    members = group_member_ids(db, user)
+    paid = func.sum(Submission.gross_amount)
+    return set(
+        db.scalars(
+            select(Submission.campaign_id)
+            .join(Campaign, Campaign.id == Submission.campaign_id)
+            .where(Submission.creator_id.in_(members), Campaign.cap_per_profile.is_not(None))
+            .group_by(Submission.campaign_id, Campaign.cap_per_profile)
+            .having(paid >= Campaign.cap_per_profile)
+        ).all()
     )
 
 

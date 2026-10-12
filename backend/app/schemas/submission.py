@@ -44,6 +44,9 @@ class Submission(BaseModel):
 
     created_at: datetime
 
+    # GET /api/submissions/mine only: approved, but the creator's profile has used the campaign's cap per profile.
+    profile_cap_reached: bool = False
+
 
 class SubmissionForReview(Submission):
     """Everything the admin review queue needs, joined with campaign + creator info.

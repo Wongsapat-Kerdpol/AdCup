@@ -28,6 +28,7 @@ from app.schemas.submission import Submission as SubmissionSchema
 from app.schemas.submission import SubmissionCreate
 from app.services import youtube as yt
 from app.services.identity import record_request_signals
+from app.services.link_review import capped_campaigns
 from app.services.verification import run_system_check
 
 router = APIRouter(prefix="/api/submissions", tags=["submissions (Person 2)"])
@@ -97,9 +98,16 @@ def create_submission(
 
 @router.get("/mine", response_model=list[SubmissionSchema])
 def my_submissions(user: User = Depends(require_role(UserRole.creator)), db: Session = Depends(get_db)):
-    return db.scalars(
+    submissions = db.scalars(
         select(Submission).where(Submission.creator_id == user.id).order_by(Submission.created_at.desc())
     ).all()
+    capped = capped_campaigns(db, user)  # linked account detection: shown as "Cap per profile reached"
+    return [
+        SubmissionSchema.model_validate(s).model_copy(
+            update={"profile_cap_reached": s.status == SubmissionStatus.approved and s.campaign_id in capped}
+        )
+        for s in submissions
+    ]
 
 
 @router.get("/campaign/{campaign_id}", response_model=list[SubmissionSchema])
