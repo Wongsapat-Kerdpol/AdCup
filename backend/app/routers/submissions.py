@@ -79,6 +79,8 @@ def create_submission(
     )
     db.add(submission)
     db.flush()
+    # Linked account detection: device id only, before the system check so its risk score sees it.
+    record_request_signals(db, user, request, ip=False)
 
     try:
         run_system_check(db, submission)
@@ -88,7 +90,6 @@ def create_submission(
             status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not reach YouTube, try again later"
         ) from exc
 
-    record_request_signals(db, user, request, ip=False)  # linked account detection: device id only
     db.commit()
     db.refresh(submission)
     return submission

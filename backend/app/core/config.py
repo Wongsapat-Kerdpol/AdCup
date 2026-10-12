@@ -48,3 +48,5 @@ CURRENCY = "THB"
 
 # --- Linked account detection (docs/linked-account-detection-spec.md) ---
 MAX_SHARE = 3  # a strong signal shared by more accounts than this is a "hub" (agency, mule account): flagged
+LINK_FLAG_SCORE = 50  # weak-signal risk score at which a pair of accounts is flagged "suspected"
+IP_HUB_SIZE = 5  # an IP used by more accounts than this (dorm, campus, mobile carrier NAT) scores nothing
