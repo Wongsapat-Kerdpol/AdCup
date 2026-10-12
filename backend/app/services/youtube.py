@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 import httpx
+import jwt
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -35,7 +36,9 @@ _CHANNELS_URL = "https://www.googleapis.com/youtube/v3/channels"
 _AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
 _REVOKE_URL = "https://oauth2.googleapis.com/revoke"
-_SCOPE = "https://www.googleapis.com/auth/youtube.readonly"
+# openid: the token response then carries an id_token with the Google account id ("sub"),
+# a strong signal for linked account detection (services/identity.py).
+_SCOPE = "openid https://www.googleapis.com/auth/youtube.readonly"
 
 _ID = r"([A-Za-z0-9_-]{11})"
 _PATTERNS = [
@@ -183,6 +186,20 @@ def exchange_code(code: str) -> dict:
     )
     resp.raise_for_status()
     return resp.json()
+
+
+def google_sub_from(tokens: dict) -> str | None:
+    """Google account id ("sub") from exchange_code()'s id_token, or None if there is none.
+
+    The signature isn't checked: the token came straight from Google's token endpoint over TLS, which
+    OpenID Connect allows instead of validating it (Core 1.0, section 3.1.3.7).
+    """
+    try:
+        claims = jwt.decode(tokens.get("id_token", ""), options={"verify_signature": False})
+    except jwt.PyJWTError:
+        return None
+    sub = claims.get("sub")
+    return str(sub) if sub else None
 
 
 def get_my_channel(access_token: str) -> ChannelInfo | None:

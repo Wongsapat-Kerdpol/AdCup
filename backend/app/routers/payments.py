@@ -9,7 +9,7 @@
 import uuid
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -27,6 +27,7 @@ from app.schemas.payment import (
     WithdrawRequest,
     WithdrawResponse,
 )
+from app.services.identity import record_request_signals
 
 router = APIRouter(prefix="/api", tags=["payments & wallet (Person 3)"])
 
@@ -139,6 +140,7 @@ def withdraw(
     body: WithdrawRequest,
     user: User = Depends(require_role(UserRole.creator)),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
     """Mock cash out. No bank transfer happens; the balance and ledger update as if it did."""
     # Re-read the user with a row lock so two withdrawals (or a payout) can't race the balance.
@@ -166,6 +168,7 @@ def withdraw(
     )
     creator.wallet_balance -= body.amount
     db.add(tx)
+    record_request_signals(db, creator, request)  # linked account detection
     db.commit()
     db.refresh(tx)
     return WithdrawResponse(balance=creator.wallet_balance, transaction=_to_wallet_tx(tx, None))

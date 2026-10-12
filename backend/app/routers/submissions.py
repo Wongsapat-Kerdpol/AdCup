@@ -13,7 +13,7 @@ Lifecycle: pending (system check) -> under_review (admin) -> approved (earning) 
 """
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -26,6 +26,7 @@ from app.models.user import User, UserRole
 from app.schemas.submission import Submission as SubmissionSchema
 from app.schemas.submission import SubmissionCreate
 from app.services import youtube as yt
+from app.services.identity import record_request_signals
 from app.services.verification import run_system_check
 
 router = APIRouter(prefix="/api/submissions", tags=["submissions (Person 2)"])
@@ -38,6 +39,7 @@ def create_submission(
     body: SubmissionCreate,
     user: User = Depends(require_role(UserRole.creator)),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
     campaign = db.get(Campaign, body.campaign_id)
     if campaign is None:
@@ -82,6 +84,7 @@ def create_submission(
             status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not reach YouTube, try again later"
         ) from exc
 
+    record_request_signals(db, user, request, ip=False)  # linked account detection: device id only
     db.commit()
     db.refresh(submission)
     return submission
