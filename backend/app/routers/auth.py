@@ -6,7 +6,7 @@
 [PERSON 1] POST /api/auth/login       -> email + password, returns TokenResponse
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -15,8 +15,11 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
+from app.models.identity import SignalType
 from app.models.user import User
 from app.schemas.user import DevLoginRequest, LoginRequest, RegisterRequest, TokenResponse, UserPublic
+from app.services.identity import normalize_email, record_request_signals, record_signal
+from app.services.linking import rebuild_profile_groups
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -40,7 +43,7 @@ def dev_login(body: DevLoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
+def register(body: RegisterRequest, db: Session = Depends(get_db), request: Request = None):
     if db.scalar(select(User).where(User.email == body.email)):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email already exists")
 
@@ -57,13 +60,21 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email already exists")
     db.refresh(user)
+
+    # Linked account detection (services/identity.py); creators only.
+    if record_signal(db, user, SignalType.email_norm, normalize_email(user.email)):
+        rebuild_profile_groups(db)
+    record_request_signals(db, user, request)
+    db.commit()
     return TokenResponse(access_token=create_access_token(user.id, user.role.value), user=user)
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)):
+def login(body: LoginRequest, db: Session = Depends(get_db), request: Request = None):
     user = db.scalar(select(User).where(User.email == body.email.strip().lower()))
     # Same message for "no such email" and "wrong password" so attackers can't probe which emails exist.
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
+    record_request_signals(db, user, request)
+    db.commit()
     return TokenResponse(access_token=create_access_token(user.id, user.role.value), user=user)

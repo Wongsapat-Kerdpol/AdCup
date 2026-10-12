@@ -4,7 +4,8 @@ Example: the brand requires "the water bottle must be visible in the video". The
 video and approves or rejects. Every endpoint is guarded with Depends(require_role(UserRole.admin)).
 
   GET  /api/admin/review                  — queue: submissions with status=under_review, oldest first,
-                                             incl. campaign.requirements, video url/title, views, creator
+                                             incl. campaign.requirements, video url/title, views, creator,
+                                             and linked accounts / open link flags of the creator's group
   POST /api/admin/review/{id}/approve     — status=approved, approved_at=now, reviewed_by_id/at
                                              (earns from the next payout round — see services/payout.py)
   POST /api/admin/review/{id}/reject      — body {reason}; status=rejected, rejected_by=admin
@@ -24,6 +25,7 @@ from app.models.user import User, UserRole
 from app.schemas.submission import RejectRequest
 from app.schemas.submission import Submission as SubmissionSchema
 from app.schemas.submission import SubmissionForReview
+from app.services.link_review import review_info
 
 router = APIRouter(prefix="/api/admin/review", tags=["admin review (Person 2)"])
 
@@ -39,7 +41,12 @@ def review_queue(_: User = Depends(require_role(UserRole.admin)), db: Session = 
     ).all()
     return [
         SubmissionForReview.model_validate(submission).model_copy(
-            update={"campaign_title": title, "campaign_requirements": requirements, "creator_name": creator_name}
+            update={
+                "campaign_title": title,
+                "campaign_requirements": requirements,
+                "creator_name": creator_name,
+                **review_info(db, submission),  # linked account detection: boxes above Approve / Reject
+            }
         )
         for submission, title, requirements, creator_name in rows
     ]

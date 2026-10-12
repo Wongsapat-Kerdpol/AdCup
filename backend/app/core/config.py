@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Duplicate-clip checker (dHash + BK-Tree). Turn off to hide the warnings without touching code.
     enable_anti_fraud: bool = True
 
+    # Key for HMAC-hashing identity signals (linked account detection). Raw values are never stored.
+    identity_hash_secret: str = "change-me-identity"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
@@ -50,3 +53,8 @@ CURRENCY = "THB"
 DUPLICATE_MATCH_RADIUS = 8  # a picture "matches" an old one when they differ by at most this many bits
 DUPLICATE_NEAR_EXACT = 3  # "almost identical" picture -> yellow "Should check" warning
 DUPLICATE_COPY_RATIO = 0.6  # share of pictures matching one old clip -> red "Probably a copy" warning
+
+# --- Linked account detection (docs/linked-account-detection-spec.md) ---
+MAX_SHARE = 3  # a strong signal shared by more accounts than this is a "hub" (agency, mule account): flagged
+LINK_FLAG_SCORE = 50  # weak-signal risk score at which a pair of accounts is flagged "suspected"
+IP_HUB_SIZE = 5  # an IP used by more accounts than this (dorm, campus, mobile carrier NAT) scores nothing

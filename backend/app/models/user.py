@@ -2,7 +2,7 @@ import enum
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, Numeric, String, func
+from sqlalchemy import DateTime, Enum, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -12,6 +12,11 @@ class UserRole(str, enum.Enum):
     brand = "brand"
     creator = "creator"
     admin = "admin"
+
+
+class PayoutMethod(str, enum.Enum):
+    promptpay = "promptpay"
+    bank = "bank"
 
 
 class User(Base):
@@ -31,5 +36,14 @@ class User(Base):
     youtube_channel_id: Mapped[str | None] = mapped_column(String(100))
     youtube_channel_title: Mapped[str | None] = mapped_column(String(255))
     google_refresh_token: Mapped[str | None] = mapped_column(String(1024))
+
+    # Linked account detection. Accounts of the same person share one cap per profile; the group id
+    # is the smallest user id in the group (services/linking.py). Never sent to creators.
+    profile_group_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    # Payout account, display-only (masked). The full value is kept only as an HMAC in identity_signals.
+    payout_method: Mapped[PayoutMethod | None] = mapped_column(Enum(PayoutMethod, native_enum=False, length=20))
+    payout_bank_code: Mapped[str | None] = mapped_column(String(20))
+    payout_account_masked: Mapped[str | None] = mapped_column(String(30))  # e.g. "••• 5678"
+    payout_account_name: Mapped[str | None] = mapped_column(String(100))
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

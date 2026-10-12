@@ -7,7 +7,7 @@ Payouts are INCREMENTAL: a round pays only for the views gained since the last r
 
 HOW A ROUND WORKS (nobody is paid first: the whole pool is shared at once)
   1. demand : every approved video has earned (view_count - paid_views) / 1000 * rate, limited by
-              cap_per_post and (per creator) cap_per_profile.
+              cap_per_post and (per profile = linked accounts of one person) cap_per_profile.
   2. split  : if the pool covers all demands everybody is paid in full. Otherwise every video gets the
               same percentage of what it earned (services/allocation.py). Approval order and refresh
               timing don't matter.
@@ -52,8 +52,10 @@ def from_satang(satang: int) -> Decimal:
     return (Decimal(satang) / Decimal(100)).quantize(Decimal("0.01"))
 
 
-def _demands(campaign: Campaign, submissions: list[Submission]) -> list[int]:
-    """What each submission has earned since its last payout, in satang, after the caps."""
+def _demands(campaign: Campaign, submissions: list[Submission], profile_of: dict[int, int]) -> list[int]:
+    """What each submission has earned since its last payout, in satang, after the caps.
+
+    profile_of: creator id -> profile group (linked accounts of one person share the cap per profile)."""
     demand: dict[int, int] = {}
     for submission in submissions:
         new_views = submission.view_count - submission.paid_views
@@ -66,12 +68,13 @@ def _demands(campaign: Campaign, submissions: list[Submission]) -> list[int]:
         demand[submission.id] = satang
 
     if campaign.cap_per_profile is not None:
-        # A creator's remaining allowance is shared between their own videos with the same
-        # proportional rule, before the pool is split between creators.
-        by_creator: dict[int, list[Submission]] = defaultdict(list)
+        # A profile's remaining allowance is shared between its videos with the same proportional rule,
+        # before the pool is split between profiles. A profile is one person: every creator account
+        # linked to them (services/linking.py), so a second account doesn't get a second cap.
+        by_profile: dict[int, list[Submission]] = defaultdict(list)
         for submission in submissions:
-            by_creator[submission.creator_id].append(submission)
-        for videos in by_creator.values():
+            by_profile[profile_of.get(submission.creator_id, submission.creator_id)].append(submission)
+        for videos in by_profile.values():
             earned = sum(to_satang(v.gross_amount) for v in videos)
             allowance = max(to_satang(campaign.cap_per_profile) - earned, 0)
             capped = proportional_share([demand[v.id] for v in videos], allowance)
@@ -106,7 +109,14 @@ def settle_campaign(db: Session, campaign_id: int) -> list[Transaction]:
     if not submissions:
         return []
 
-    demands = _demands(campaign, submissions)
+    # Accounts not grouped yet (profile_group_id is NULL, e.g. older data) count as their own profile.
+    profile_of = {
+        user_id: group_id or user_id
+        for user_id, group_id in db.execute(
+            select(User.id, User.profile_group_id).where(User.id.in_({s.creator_id for s in submissions}))
+        )
+    }
+    demands = _demands(campaign, submissions, profile_of)
     granted = proportional_share(demands, to_satang(campaign.remaining_budget))
 
     transactions: list[Transaction] = []

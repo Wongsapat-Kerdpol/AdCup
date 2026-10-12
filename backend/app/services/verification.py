@@ -13,7 +13,8 @@ run_system_check(db, submission) -> None
     * 1–5 fail                      -> status=rejected, rejected_by=system, rejection_reason=<why>
     * 1–5 pass, 6 not yet           -> stay pending (re-checked on every views refresh);
                                        reject with "not enough views" once the campaign deadline passes
-    * all pass                      -> status=under_review, system_checked_at=now  (admin queue)
+    * all pass                      -> status=under_review, system_checked_at=now  (admin queue);
+                                       pairs of accounts sharing a device / IP get a risk score (services/risk.py)
   Always store video_title / video_channel_id / video_published_at / view_count on the submission
   so the admin can see them in the review queue.
 
@@ -32,6 +33,7 @@ from app.models.submission import RejectedBy, Submission, SubmissionStatus
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 from app.services import youtube as yt
+from app.services.risk import flag_suspected_links
 
 
 def _campaign_start(db: Session, campaign: Campaign) -> datetime:
@@ -109,3 +111,4 @@ def run_system_check(db: Session, submission: Submission) -> None:
 
     submission.status = SubmissionStatus.under_review
     submission.system_checked_at = datetime.now(timezone.utc)
+    flag_suspected_links(db, submission)  # linked account detection: weak-signal risk score (services/risk.py)

@@ -4,13 +4,18 @@
 // detail page can drop this in too once it exists — it only needs a campaignId.
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, ApiError } from "@/lib/api";
+import { routes } from "@/lib/routes";
 import type { Submission } from "@/lib/types";
+
+// Same text as backend routers/submissions.py PAYOUT_ACCOUNT_REQUIRED (linked account detection, spec D8).
+const PAYOUT_ACCOUNT_REQUIRED = "Set up your payout account in Settings first";
 
 export function SubmitContentForm({
   campaignId,
@@ -19,6 +24,7 @@ export function SubmitContentForm({
   campaignId: number | string;
   onSubmitted?: (submission: Submission) => void;
 }) {
+  const router = useRouter();
   const [videoUrl, setVideoUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -34,7 +40,11 @@ export function SubmitContentForm({
       setVideoUrl("");
       onSubmitted?.(submission);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Could not submit that video");
+      if (err instanceof ApiError && err.message === PAYOUT_ACCOUNT_REQUIRED) {
+        toast.error(err.message, { action: { label: "Open Settings", onClick: () => router.push(routes.settings) } });
+      } else {
+        toast.error(err instanceof ApiError ? err.message : "Could not submit that video");
+      }
     } finally {
       setSubmitting(false);
     }

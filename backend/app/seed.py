@@ -12,9 +12,12 @@ from sqlalchemy import func, select
 
 from app.core.database import SessionLocal
 from app.core.security import hash_password
-from app.models import Campaign, CampaignCategory, CampaignStatus, User, UserRole
+from app.models import Campaign, CampaignCategory, CampaignStatus, PayoutMethod, SignalType, User, UserRole
+from app.services.identity import normalize_email, normalize_promptpay, record_signal
+from app.services.linking import rebuild_profile_groups
 
 DEMO_PASSWORD = "password123"
+DEMO_PROMPTPAY = "0800000003"  # fake PromptPay phone for the seeded creator
 
 USERS = [
     ("brand@adcup.dev", "Siam Coffee Co.", UserRole.brand),
@@ -54,6 +57,16 @@ def seed_if_empty() -> None:
         db.add_all(users)
         db.flush()
         brands = [u for u in users if u.role == UserRole.brand]
+
+        # Creators get the same identity signals as a web sign-up, plus a (fake) payout account so they can
+        # submit right away (linked account detection, spec D8).
+        for creator in (u for u in users if u.role == UserRole.creator):
+            creator.payout_method = PayoutMethod.promptpay
+            creator.payout_account_masked = f"••• {DEMO_PROMPTPAY[-4:]}"
+            creator.payout_account_name = creator.display_name
+            record_signal(db, creator, SignalType.email_norm, normalize_email(creator.email))
+            record_signal(db, creator, SignalType.payout_account, normalize_promptpay(DEMO_PROMPTPAY))
+        rebuild_profile_groups(db)
 
         now = datetime.now(timezone.utc)
         for i, (title, cat, platforms, rate, budget, frac, days, b) in enumerate(CAMPAIGNS):

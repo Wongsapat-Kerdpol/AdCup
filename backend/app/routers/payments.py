@@ -3,13 +3,14 @@
   POST /api/payments/checkout/{campaign_id} — mock payment; set campaign.is_funded=True,
                                               status=active, write Transaction(type=campaign_fund)
   GET  /api/wallet                          — balance + transaction history for current user
-  POST /api/wallet/withdraw                 — creator cash out; amount >= MIN_WITHDRAWAL_THB and <= balance
+  POST /api/wallet/withdraw                 — creator cash out; amount >= MIN_WITHDRAWAL_THB and <= balance;
+                                              409 while a linked-account flag holds withdrawals
 """
 
 import uuid
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -27,8 +28,12 @@ from app.schemas.payment import (
     WithdrawRequest,
     WithdrawResponse,
 )
+from app.services.identity import record_request_signals
+from app.services.link_review import withdrawals_on_hold
 
 router = APIRouter(prefix="/api", tags=["payments & wallet (Person 3)"])
+
+WITHDRAWALS_ON_HOLD = "Withdrawals are on hold while we review your account."
 
 
 @router.post("/payments/checkout/{campaign_id}", response_model=CheckoutResponse)
@@ -123,10 +128,12 @@ def get_wallet(
             )
         )
 
+    on_hold = user.role == UserRole.creator and withdrawals_on_hold(db, user)
     return WalletResponse(
         balance=user.wallet_balance,
         min_withdrawal=MIN_WITHDRAWAL_THB,
-        can_withdraw=user.role == UserRole.creator and user.wallet_balance >= MIN_WITHDRAWAL_THB,
+        can_withdraw=user.role == UserRole.creator and user.wallet_balance >= MIN_WITHDRAWAL_THB and not on_hold,
+        withdrawals_on_hold=on_hold,
         total_earned=total(TransactionType.payout, Transaction.net_amount),
         total_commission=total(TransactionType.payout, Transaction.commission_amount),
         total_withdrawn=total(TransactionType.withdrawal, Transaction.net_amount),
@@ -139,6 +146,7 @@ def withdraw(
     body: WithdrawRequest,
     user: User = Depends(require_role(UserRole.creator)),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
     """Mock cash out. No bank transfer happens; the balance and ledger update as if it did."""
     # Re-read the user with a row lock so two withdrawals (or a payout) can't race the balance.
@@ -147,6 +155,9 @@ def withdraw(
         select(User).where(User.id == user.id).with_for_update().execution_options(populate_existing=True)
     )
 
+    # Linked account detection (spec D11): checked after the lock. The reason is never shown (spec D16).
+    if withdrawals_on_hold(db, creator):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=WITHDRAWALS_ON_HOLD)
     if body.amount < MIN_WITHDRAWAL_THB:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -166,6 +177,7 @@ def withdraw(
     )
     creator.wallet_balance -= body.amount
     db.add(tx)
+    record_request_signals(db, creator, request)  # linked account detection
     db.commit()
     db.refresh(tx)
     return WithdrawResponse(balance=creator.wallet_balance, transaction=_to_wallet_tx(tx, None))

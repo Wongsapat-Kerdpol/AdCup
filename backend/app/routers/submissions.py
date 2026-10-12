@@ -1,7 +1,8 @@
 """[PERSON 2] Content submission (creator side) + read-only views for brands.
 
   POST /api/submissions                   — creator submits a YouTube link for a campaign
-                                             (creator only; campaign must be active; must have connected YouTube)
+                                             (creator only; campaign must be active; must have connected YouTube
+                                              and set up a payout account)
                                              -> save with status=pending, external_video_id=extract_video_id(url)
                                              -> run services.verification.run_system_check()
   GET  /api/submissions/mine              — creator's submissions: status, rejection reason, views,
@@ -13,7 +14,7 @@ Lifecycle: pending (system check) -> under_review (admin) -> approved (earning) 
 """
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -26,11 +27,14 @@ from app.models.user import User, UserRole
 from app.schemas.submission import Submission as SubmissionSchema
 from app.schemas.submission import SubmissionCreate
 from app.services import youtube as yt
+from app.services.identity import record_request_signals
+from app.services.link_review import capped_campaigns
 from app.services.verification import run_system_check
 
 router = APIRouter(prefix="/api/submissions", tags=["submissions (Person 2)"])
 
 PLATFORM = "youtube"  # only platform wired up end-to-end for now
+PAYOUT_ACCOUNT_REQUIRED = "Set up your payout account in Settings first"  # the frontend matches this text
 
 
 @router.post("", response_model=SubmissionSchema)
@@ -38,6 +42,7 @@ def create_submission(
     body: SubmissionCreate,
     user: User = Depends(require_role(UserRole.creator)),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
     campaign = db.get(Campaign, body.campaign_id)
     if campaign is None:
@@ -50,6 +55,8 @@ def create_submission(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Connect your YouTube channel in Settings first"
         )
+    if user.payout_method is None:  # linked account detection, spec D8 (see routers/payout_method.py)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PAYOUT_ACCOUNT_REQUIRED)
 
     video_id = yt.extract_video_id(body.video_url)
     if video_id is None:
@@ -73,6 +80,8 @@ def create_submission(
     )
     db.add(submission)
     db.flush()
+    # Linked account detection: device id only, before the system check so its risk score sees it.
+    record_request_signals(db, user, request, ip=False)
 
     try:
         run_system_check(db, submission)
@@ -89,9 +98,16 @@ def create_submission(
 
 @router.get("/mine", response_model=list[SubmissionSchema])
 def my_submissions(user: User = Depends(require_role(UserRole.creator)), db: Session = Depends(get_db)):
-    return db.scalars(
+    submissions = db.scalars(
         select(Submission).where(Submission.creator_id == user.id).order_by(Submission.created_at.desc())
     ).all()
+    capped = capped_campaigns(db, user)  # linked account detection: shown as "Cap per profile reached"
+    return [
+        SubmissionSchema.model_validate(s).model_copy(
+            update={"profile_cap_reached": s.status == SubmissionStatus.approved and s.campaign_id in capped}
+        )
+        for s in submissions
+    ]
 
 
 @router.get("/campaign/{campaign_id}", response_model=list[SubmissionSchema])

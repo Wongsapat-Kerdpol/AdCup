@@ -6,6 +6,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.submission import RejectedBy, SubmissionStatus
+from app.schemas.linked_accounts import LinkedAccount, OpenLinkFlag
 
 
 class SubmissionCreate(BaseModel):
@@ -43,6 +44,9 @@ class Submission(BaseModel):
 
     created_at: datetime
 
+    # GET /api/submissions/mine only: approved, but the creator's profile has used the campaign's cap per profile.
+    profile_cap_reached: bool = False
+
 
 class SubmissionForReview(Submission):
     """Everything the admin review queue needs, joined with campaign + creator info.
@@ -54,6 +58,13 @@ class SubmissionForReview(Submission):
     campaign_title: str = ""
     campaign_requirements: str = ""
     creator_name: str = ""
+
+    # Linked account detection (services/link_review.py::review_info). Content approval is unchanged;
+    # whether accounts are the same person is decided on /admin/linked-accounts.
+    linked_accounts: list[LinkedAccount] = []
+    group_gross_in_campaign: Decimal = Decimal("0")
+    cap_per_profile: Decimal | None = None
+    open_flags: list[OpenLinkFlag] = []
 
 
 class RejectRequest(BaseModel):

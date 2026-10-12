@@ -199,6 +199,12 @@ function SubmissionCard({
               {formatTHB(s.net_amount)}
             </dd>
           </div>
+          {s.profile_cap_reached && (
+            <div>
+              <dt className="text-muted-foreground">Earnings</dt>
+              <dd className="font-medium text-amber-400">Cap per profile reached</dd>
+            </div>
+          )}
         </dl>
         <Button size="sm" variant="outline" onClick={onRefresh} disabled={refreshing || s.status === "rejected"}>
           {refreshing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
