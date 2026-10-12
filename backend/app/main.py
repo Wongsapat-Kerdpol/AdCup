@@ -10,6 +10,7 @@ from app.routers import (
     auth,
     campaign_manage,
     campaigns,
+    linked_accounts,
     outlook,
     payments,
     payout_method,
@@ -55,6 +56,7 @@ app.include_router(payments.router)
 app.include_router(admin.router)
 # Linked account detection
 app.include_router(payout_method.router)
+app.include_router(linked_accounts.router)
 
 
 @app.get("/api/health", tags=["meta"])

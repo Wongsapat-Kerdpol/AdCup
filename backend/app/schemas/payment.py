@@ -49,6 +49,7 @@ class WalletResponse(BaseModel):
     balance: Decimal
     min_withdrawal: Decimal
     can_withdraw: bool
+    withdrawals_on_hold: bool = False  # linked account detection: an admin is reviewing this account
     total_earned: Decimal  # sum of net payouts
     total_commission: Decimal  # platform's 10% taken from those payouts
     total_withdrawn: Decimal
