@@ -1,7 +1,7 @@
 "use client";
 
-// [PERSON 2] Submit a YouTube link to a campaign. Used on /submissions; Person 1's campaign
-// detail page can drop this in too once it exists — it only needs a campaignId.
+// [PERSON 2] Submit a video link to a campaign. Used on /submissions and the campaign detail page.
+// The backend detects the platform from the link (Person 3); `platforms` only tunes the placeholder.
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -12,19 +12,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, ApiError } from "@/lib/api";
 import { routes } from "@/lib/routes";
-import type { Submission } from "@/lib/types";
+import type { Platform, Submission } from "@/lib/types";
+
+const examples: Partial<Record<Platform, string>> = {
+  youtube: "https://youtube.com/watch?v=...",
+  tiktok: "https://www.tiktok.com/@you/video/...",
+};
 
 // Same text as backend routers/submissions.py PAYOUT_ACCOUNT_REQUIRED (linked account detection, spec D8).
 const PAYOUT_ACCOUNT_REQUIRED = "Set up your payout account in Settings first";
 
 export function SubmitContentForm({
   campaignId,
+  platforms = ["youtube"],
   onSubmitted,
 }: {
   campaignId: number | string;
+  platforms?: Platform[];
   onSubmitted?: (submission: Submission) => void;
 }) {
   const router = useRouter();
+  const placeholder = platforms.length === 1 ? (examples[platforms[0]] ?? "Paste your video link") : "Paste your video link";
   const [videoUrl, setVideoUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -53,7 +61,8 @@ export function SubmitContentForm({
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
       <Input
-        placeholder="https://youtube.com/watch?v=..."
+        placeholder={placeholder}
+        aria-label="Video link"
         value={videoUrl}
         onChange={(e) => setVideoUrl(e.target.value)}
         disabled={submitting}

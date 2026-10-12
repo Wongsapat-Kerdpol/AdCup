@@ -1,10 +1,11 @@
 """[PERSON 2] Content submission (creator side) + read-only views for brands.
 
-  POST /api/submissions                   — creator submits a YouTube link for a campaign
-                                             (creator only; campaign must be active; must have connected YouTube
-                                              and set up a payout account)
-                                             -> save with status=pending, external_video_id=extract_video_id(url)
-                                             -> run services.verification.run_system_check()
+  POST /api/submissions                   — creator submits a video link for a campaign
+                                             (creator only; campaign must be active and accept that platform;
+                                             creator must have connected their account on that platform
+                                             and set up a payout account)
+                                             -> platform + external_video_id detected from the link (services/platforms)
+                                             -> save with status=pending, run services.verification.run_system_check()
   GET  /api/submissions/mine              — creator's submissions: status, rejection reason, views,
                                              gross / commission / net earned so far
   GET  /api/submissions/campaign/{id}     — brand owner of that campaign: READ-ONLY list
@@ -26,14 +27,13 @@ from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
 from app.schemas.submission import Submission as SubmissionSchema
 from app.schemas.submission import SubmissionCreate
-from app.services import youtube as yt
+from app.services import platforms
 from app.services.identity import record_request_signals
 from app.services.link_review import capped_campaigns
 from app.services.verification import run_system_check
 
 router = APIRouter(prefix="/api/submissions", tags=["submissions (Person 2)"])
 
-PLATFORM = "youtube"  # only platform wired up end-to-end for now
 PAYOUT_ACCOUNT_REQUIRED = "Set up your payout account in Settings first"  # the frontend matches this text
 
 
@@ -49,22 +49,29 @@ def create_submission(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
     if campaign.status != CampaignStatus.active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Campaign is not accepting submissions")
-    if PLATFORM not in SUPPORTED_SUBMISSION_PLATFORMS:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Platform is not supported yet")
-    if not user.youtube_channel_id:
+    detected = platforms.detect(body.video_url)
+    if detected is None:
+        labels = " or ".join(a.label for a in platforms.supported_adapters())
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Could not recognize that link — paste a {labels} video URL")
+    adapter, video_id = detected
+    if adapter.name not in SUPPORTED_SUBMISSION_PLATFORMS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{adapter.label} is not supported yet")
+    if campaign.platforms and adapter.name not in campaign.platforms:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Connect your YouTube channel in Settings first"
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"This campaign doesn't accept {adapter.label} videos"
+        )
+    if not adapter.connected_account_id(db, user):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Connect your {adapter.account_label} in Settings first"
         )
     if user.payout_method is None:  # linked account detection, spec D8 (see routers/payout_method.py)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PAYOUT_ACCOUNT_REQUIRED)
 
-    video_id = yt.extract_video_id(body.video_url)
-    if video_id is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not recognize that YouTube link")
-
     duplicate = db.scalar(
         select(Submission.id).where(
-            Submission.campaign_id == campaign.id, Submission.external_video_id == video_id
+            Submission.campaign_id == campaign.id,
+            Submission.platform == adapter.name,
+            Submission.external_video_id == video_id,
         )
     )
     if duplicate is not None:
@@ -74,7 +81,7 @@ def create_submission(
         campaign_id=campaign.id,
         creator_id=user.id,
         video_url=body.video_url,
-        platform=PLATFORM,
+        platform=adapter.name,
         external_video_id=video_id,
         status=SubmissionStatus.pending,
     )
@@ -85,10 +92,13 @@ def create_submission(
 
     try:
         run_system_check(db, submission)
+    except platforms.PlatformError as exc:  # e.g. their TikTok login expired — they can fix it
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except (httpx.HTTPError, RuntimeError) as exc:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not reach YouTube, try again later"
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not reach {adapter.label}, try again later"
         ) from exc
 
     db.commit()

@@ -12,13 +12,16 @@ from app.routers import (
     campaign_manage,
     campaigns,
     duplicates,
+    legal,
     linked_accounts,
     outlook,
     payments,
     payout_method,
+    platforms,
     review,
     settlement,
     submissions,
+    tiktok,
     youtube,
 )
 from app.seed import seed_if_empty
@@ -55,9 +58,12 @@ app.include_router(submissions.router)
 app.include_router(review.router)
 app.include_router(settlement.router)
 # Person 3
+app.include_router(platforms.router)
 app.include_router(youtube.router)
+app.include_router(tiktok.router)
 app.include_router(payments.router)
 app.include_router(admin.router)
+app.include_router(legal.router)
 # Linked account detection
 app.include_router(payout_method.router)
 app.include_router(linked_accounts.router)

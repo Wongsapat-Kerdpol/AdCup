@@ -181,6 +181,16 @@ export interface LinksResponse {
   groups: { group_id: number; members: LinkedUser[]; matched: string[] }[];
 }
 
+// Person 3 — video platforms (GET /api/platforms)
+export interface PlatformStatus {
+  name: Platform;
+  label: string;
+  account_label: string; // "YouTube channel", "TikTok account"
+  supported: boolean; // accepted for submissions right now
+  connected: boolean; // the current user linked an account on it
+  account_name: string | null;
+}
+
 // Person 3 — mock checkout (POST /api/payments/checkout/{id})
 export type PaymentMethod = "promptpay" | "card";
 

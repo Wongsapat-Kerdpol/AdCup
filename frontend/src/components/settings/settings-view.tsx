@@ -1,8 +1,8 @@
 "use client";
 
-// [PERSON 3] Settings: profile summary + YouTube connect/disconnect (+ payout account, linked account detection).
-// Connect: GET /api/youtube/connect -> redirect to Google -> backend callback -> back here with
-// ?youtube=<result>, which we turn into a toast and then strip from the URL.
+// [PERSON 3] Settings: profile summary + connect/disconnect each video platform (+ payout account,
+// linked account detection). Connect: GET /api/<platform>/connect -> redirect to the platform -> backend
+// callback -> back here with ?<platform>=<result>, which we turn into a toast and then strip from the URL.
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -16,23 +16,36 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/api";
-import type { PayoutMethod, PayoutMethodResponse, User } from "@/lib/types";
+import type { PayoutMethod, PayoutMethodResponse, PlatformStatus, User } from "@/lib/types";
+import { usePlatforms } from "@/lib/use-platforms";
 
-const callbackMessages: Record<string, { ok: boolean; text: string }> = {
-  connected: { ok: true, text: "YouTube channel connected" },
-  denied: { ok: false, text: "Connection cancelled on Google" },
-  no_channel: { ok: false, text: "That Google account has no YouTube channel — create one first or pick another account" },
-  channel_taken: { ok: false, text: "That channel is already linked to another AdCup account" },
-  missing_scope: {
-    ok: false,
-    text: "Tick “View your YouTube account” on Google's screen — we need it to confirm your channel",
+type Messages = Record<string, { ok: boolean; text: string }>;
+
+const callbackMessages: Record<"youtube" | "tiktok", Messages> = {
+  youtube: {
+    connected: { ok: true, text: "YouTube channel connected" },
+    denied: { ok: false, text: "Connection cancelled on Google" },
+    no_channel: { ok: false, text: "That Google account has no YouTube channel — create one first or pick another account" },
+    channel_taken: { ok: false, text: "That channel is already linked to another AdCup account" },
+    missing_scope: {
+      ok: false,
+      text: "Tick “View your YouTube account” on Google's screen — we need it to confirm your channel",
+    },
+    expired: { ok: false, text: "The connect link expired — please try again" },
+    error: { ok: false, text: "Could not connect YouTube — please try again" },
   },
-  expired: { ok: false, text: "The connect link expired — please try again" },
-  error: { ok: false, text: "Could not connect YouTube — please try again" },
+  tiktok: {
+    connected: { ok: true, text: "TikTok account connected" },
+    denied: { ok: false, text: "Connection cancelled on TikTok" },
+    account_taken: { ok: false, text: "That TikTok account is already linked to another AdCup account" },
+    expired: { ok: false, text: "The connect link expired — please try again" },
+    error: { ok: false, text: "Could not connect TikTok — please try again" },
+  },
 };
 
 export function SettingsView() {
   const { user, refresh } = useAuth();
+  const { platforms, reload: reloadPlatforms } = usePlatforms();
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -40,15 +53,19 @@ export function SettingsView() {
 
   // Result of the OAuth round-trip.
   useEffect(() => {
-    const result = params.get("youtube");
-    if (!result || handled.current) return;
+    const platform = (["youtube", "tiktok"] as const).find((p) => params.get(p));
+    if (!platform || handled.current) return;
     handled.current = true;
-    const msg = callbackMessages[result] ?? callbackMessages.error;
+    const messages = callbackMessages[platform];
+    const msg = messages[params.get(platform)!] ?? messages.error;
     if (msg.ok) toast.success(msg.text);
     else toast.error(msg.text);
     refresh();
+    reloadPlatforms();
     router.replace(pathname, { scroll: false });
-  }, [params, pathname, refresh, router]);
+  }, [params, pathname, refresh, reloadPlatforms, router]);
+
+  const tiktok = platforms?.find((p) => p.name === "tiktok");
 
   if (!user) return null;
 
@@ -72,11 +89,12 @@ export function SettingsView() {
       {user.role === "creator" ? (
         <>
           <YouTubeCard user={user} onChange={refresh} />
+          {tiktok?.supported && <TikTokCard status={tiktok} onChange={reloadPlatforms} />}
           <PayoutAccountCard />
         </>
       ) : (
         <section className="rounded-xl border border-dashed bg-card p-5 text-sm text-muted-foreground">
-          YouTube linking is only needed for creator accounts.
+          Linking YouTube or TikTok is only needed for creator accounts.
         </section>
       )}
     </div>
@@ -175,6 +193,97 @@ function YouTubeCard({ user, onChange }: { user: User; onChange: () => Promise<v
           <Button onClick={connect} disabled={busy}>
             {busy ? <Loader2 className="animate-spin" /> : <PlatformIcon platform="youtube" />}
             Connect YouTube
+          </Button>
+        </>
+      )}
+    </section>
+  );
+}
+
+function TikTokCard({ status, onChange }: { status: PlatformStatus; onChange: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  async function connect() {
+    setBusy(true);
+    try {
+      const { auth_url } = await api<{ auth_url: string }>("/api/tiktok/connect");
+      window.location.href = auth_url; // leaves the app; busy state stays on until the page unloads
+    } catch (err) {
+      toast.error((err as Error).message);
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    try {
+      await api("/api/tiktok/disconnect", { method: "POST" });
+      await onChange();
+      toast.success("TikTok account disconnected");
+    } catch (err) {
+      toast.error(`Could not disconnect: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <section className="space-y-4 rounded-xl border bg-card p-5">
+      <div className="flex items-center gap-2">
+        <PlatformIcon platform="tiktok" />
+        <h2 className="font-semibold">TikTok account</h2>
+        {status.connected && (
+          <Badge variant="success" className="ml-auto">
+            <CheckCircle2 /> Connected
+          </Badge>
+        )}
+      </div>
+
+      {status.connected ? (
+        <>
+          <div className="rounded-lg bg-muted/50 p-3">
+            <p className="truncate font-medium">{status.account_name || "TikTok account"}</p>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Only public videos posted by this account pass the system check. We use your TikTok login to read their
+            views, so keep it connected while your videos are earning.
+          </p>
+          {confirming ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-destructive/40 p-3 text-sm">
+              <span className="mr-auto">Disconnect? We won&apos;t be able to read views on your TikTok videos.</span>
+              <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={busy}>
+                Cancel
+              </Button>
+              <Button variant="destructive" size="sm" onClick={disconnect} disabled={busy}>
+                {busy && <Loader2 className="animate-spin" />} Disconnect
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" onClick={() => setConfirming(true)}>
+              <Unlink /> Disconnect TikTok
+            </Button>
+          )}
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground">
+            Connect the TikTok account you post on to submit TikTok videos. TikTok only shares view counts with the
+            account owner, so this is how we confirm a video is yours and track its views.
+          </p>
+          <ul className="space-y-1.5 text-sm text-muted-foreground">
+            <li className="flex items-start gap-2">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" /> Read-only: your profile name and your
+              public videos&apos; stats
+            </li>
+            <li className="flex items-start gap-2">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" /> You can disconnect at any time
+            </li>
+          </ul>
+          <Button onClick={connect} disabled={busy}>
+            {busy ? <Loader2 className="animate-spin" /> : <PlatformIcon platform="tiktok" />}
+            Connect TikTok
           </Button>
         </>
       )}

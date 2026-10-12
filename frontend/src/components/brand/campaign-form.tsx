@@ -22,7 +22,7 @@ import type { Campaign, CampaignCategory, CampaignDetail, CampaignInput, Platfor
 import { cn, formatNumber, formatTHB } from "@/lib/utils";
 
 const DEFAULT_MIN_VIEWS = 1000; // backend/app/core/config.py
-const SUPPORTED_PLATFORMS: Platform[] = ["youtube"]; // SUPPORTED_SUBMISSION_PLATFORMS
+const SUPPORTED_PLATFORMS: Platform[] = ["youtube", "tiktok"]; // SUPPORTED_SUBMISSION_PLATFORMS
 const ALL_PLATFORMS: Platform[] = ["youtube", "tiktok", "instagram", "x"];
 const MONEY_RE = /^\d+(\.\d{1,2})?$/;
 
@@ -126,7 +126,21 @@ export function CampaignForm({ campaign }: { campaign?: CampaignDetail }) {
   const editing = !!campaign;
   const moneyLocked = !!campaign?.is_funded; // backend rejects money changes after funding
   const initial = useMemo(() => toValues(campaign), [campaign]);
-  const platforms: Platform[] = SUPPORTED_PLATFORMS;
+  const initialPlatforms = useMemo<Platform[]>(() => {
+    const kept = (campaign?.platforms ?? []).filter((p) => SUPPORTED_PLATFORMS.includes(p));
+    return kept.length ? kept : ["youtube"];
+  }, [campaign]);
+  const [platforms, setPlatforms] = useState<Platform[]>(initialPlatforms);
+
+  function togglePlatform(p: Platform) {
+    setPlatforms((current) =>
+      current.includes(p)
+        ? current.length > 1 // a campaign must accept at least one platform
+          ? current.filter((x) => x !== p)
+          : current
+        : SUPPORTED_PLATFORMS.filter((x) => x === p || current.includes(x)), // keep a stable order
+    );
+  }
 
   const [values, setValues] = useState<Values>(initial);
   const [errors, setErrors] = useState<Errors>({});
@@ -165,7 +179,7 @@ export function CampaignForm({ campaign }: { campaign?: CampaignDetail }) {
       }
       // PATCH only what changed, so untouched fields (e.g. a funded campaign's money rules) aren't re-sent.
       const next = toPayload(values, platforms);
-      const before = toPayload(initial, platforms);
+      const before = toPayload(initial, initialPlatforms);
       const changes = Object.fromEntries(
         (Object.keys(next) as (keyof CampaignInput)[])
           .filter((k) => JSON.stringify(next[k]) !== JSON.stringify(before[k]))
@@ -351,22 +365,37 @@ export function CampaignForm({ campaign }: { campaign?: CampaignDetail }) {
                 className="w-fit"
               />
             </FormField>
-            <FormField label="Platforms">
+            <FormField label="Platforms" hint="Where creators may post. Pick at least one.">
               <div className="flex flex-wrap gap-2">
                 {ALL_PLATFORMS.map((p) => {
                   const supported = SUPPORTED_PLATFORMS.includes(p);
+                  const selected = platforms.includes(p);
+                  if (!supported) {
+                    return (
+                      <span
+                        key={p}
+                        className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm text-muted-foreground opacity-60"
+                      >
+                        <PlatformIcon platform={p} />
+                        {platformLabels[p]}
+                        <span className="text-[10px] uppercase">Soon</span>
+                      </span>
+                    );
+                  }
                   return (
-                    <span
+                    <button
                       key={p}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => togglePlatform(p)}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm",
-                        supported ? "border-primary bg-primary/10" : "text-muted-foreground opacity-60",
+                        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                        selected ? "border-primary bg-primary/10" : "text-muted-foreground hover:bg-accent",
                       )}
                     >
                       <PlatformIcon platform={p} />
                       {platformLabels[p]}
-                      {!supported && <span className="text-[10px] uppercase">Soon</span>}
-                    </span>
+                    </button>
                   );
                 })}
               </div>

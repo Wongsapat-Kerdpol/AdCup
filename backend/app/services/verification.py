@@ -1,10 +1,10 @@
 """[PERSON 2] Round 1 — automatic system check of a submission.
 
 run_system_check(db, submission) -> None
-  Uses services.youtube.get_video_info() (Person 3). Checks, in order:
-    1. platform is supported (config.SUPPORTED_SUBMISSION_PLATFORMS — YouTube only for now)
+  Reads the video through its platform adapter (services/platforms, Person 3). Checks, in order:
+    1. platform is supported (config.SUPPORTED_SUBMISSION_PLATFORMS) and accepted by the campaign
     2. video exists and is public
-    3. video.channel_id == creator.youtube_channel_id   (creator must have connected YouTube)
+    3. video owner == the creator's connected account on that platform (e.g. YouTube channel)
     4. video.published_at >= campaign start
     5. not already submitted (same external_video_id) to this campaign
     6. view_count >= campaign.min_views (default 1,000)
@@ -18,7 +18,7 @@ run_system_check(db, submission) -> None
   Always store video_title / video_channel_id / video_published_at / view_count on the submission
   so the admin can see them in the review queue.
 
-  Called only by app.services.youtube.refresh_views() and routers/submissions.py — both manage
+  Called only by app.services.platforms.refresh_views() and routers/submissions.py — both manage
   their own db.commit(); this function only db.flush()es so it never breaks their transaction.
 """
 
@@ -32,7 +32,7 @@ from app.models.campaign import Campaign
 from app.models.submission import RejectedBy, Submission, SubmissionStatus
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
-from app.services import youtube as yt
+from app.services.platforms import get_adapter
 from app.services.risk import flag_suspected_links
 
 
@@ -63,18 +63,27 @@ def run_system_check(db: Session, submission: Submission) -> None:
         submission.rejection_reason = reason
         submission.system_checked_at = datetime.now(timezone.utc)
 
-    # 1) platform supported
-    if submission.platform not in SUPPORTED_SUBMISSION_PLATFORMS:
+    # 1) platform supported, and one this campaign accepts
+    adapter = get_adapter(submission.platform)
+    if adapter is None or submission.platform not in SUPPORTED_SUBMISSION_PLATFORMS:
         return reject(f"Platform '{submission.platform}' is not supported yet")
+    if campaign.platforms and submission.platform not in campaign.platforms:
+        return reject(f"This campaign doesn't accept {adapter.label} videos")
+
+    owner_id = adapter.connected_account_id(db, creator)
+    if adapter.stats_need_user_token and not owner_id:  # can't even read the video without their login
+        return reject(f"Video does not belong to your connected {adapter.account_label}")
 
     # 2) video exists, is public
-    info = yt.get_video_info(submission.external_video_id) if submission.external_video_id else None
+    info = adapter.fetch_video(db, creator, submission.external_video_id) if submission.external_video_id else None
     if info is None:
+        if adapter.stats_need_user_token:  # the API only shows the creator's own public videos
+            return reject(f"Video not found on your connected {adapter.account_label}, or it isn't public")
         return reject("Video not found or is private")
 
     # Store the latest known data regardless of outcome — the admin queue needs it.
     submission.video_title = info.title[:300]
-    submission.video_channel_id = info.channel_id
+    submission.video_channel_id = info.owner_id
     submission.video_published_at = info.published_at
     submission.view_count = info.view_count
 
@@ -82,8 +91,8 @@ def run_system_check(db: Session, submission: Submission) -> None:
         return reject("Video is not public")
 
     # 3) ownership
-    if not creator.youtube_channel_id or info.channel_id != creator.youtube_channel_id:
-        return reject("Video does not belong to your connected YouTube channel")
+    if not owner_id or info.owner_id != owner_id:
+        return reject(f"Video does not belong to your connected {adapter.account_label}")
 
     # 4) published after campaign start
     campaign_start = _campaign_start(db, campaign)

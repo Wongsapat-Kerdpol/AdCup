@@ -1,6 +1,7 @@
 """All ORM models. Import from here so every table is registered on Base.metadata."""
 
 from app.models.campaign import Campaign, CampaignCategory, CampaignStatus, Platform
+from app.models.connected_account import ConnectedAccount
 from app.models.identity import (
     IdentitySignal,
     LinkFlag,
@@ -19,6 +20,7 @@ __all__ = [
     "Campaign",
     "CampaignCategory",
     "CampaignStatus",
+    "ConnectedAccount",
     "IdentitySignal",
     "LinkFlag",
     "LinkFlagKind",

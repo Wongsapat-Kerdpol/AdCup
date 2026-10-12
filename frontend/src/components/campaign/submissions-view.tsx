@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, ExternalLink, Loader2, RefreshCw, Video } from "lucide-react";
 import { toast } from "sonner";
 
+import { PlatformIcon, platformLabels } from "@/components/campaign/platform-icon";
 import { SubmissionStatusBadge } from "@/components/campaign/submission-status-badge";
 import { SubmitContentForm } from "@/components/campaign/submit-content-form";
 import { Button } from "@/components/ui/button";
@@ -19,8 +20,10 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
-import type { Campaign, CampaignDetail, Paginated, Submission } from "@/lib/types";
+import type { Campaign, CampaignDetail, Paginated, Platform, Submission } from "@/lib/types";
 import { cn, formatNumber, formatTHB, toNumber } from "@/lib/utils";
+
+const isPlatform = (p: string): p is Platform => p in platformLabels;
 
 export function SubmissionsView() {
   const [submissions, setSubmissions] = useState<Submission[] | null>(null);
@@ -59,9 +62,10 @@ export function SubmissionsView() {
   async function refreshViews(id: number) {
     setRefreshingId(id);
     try {
-      await api(`/api/youtube/refresh/${id}`, { method: "POST" });
+      const res = await api<{ throttled: boolean }>(`/api/platforms/refresh/${id}`, { method: "POST" });
       await load();
-      toast.success("Views refreshed");
+      if (res.throttled) toast.info("Refreshed a moment ago — try again in 30 seconds");
+      else toast.success("Views refreshed");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Could not refresh views");
     } finally {
@@ -95,7 +99,11 @@ export function SubmissionsView() {
           </Select>
           <div className="flex-1">
             {pickerCampaignId ? (
-              <SubmitContentForm campaignId={pickerCampaignId} onSubmitted={load} />
+              <SubmitContentForm
+                campaignId={pickerCampaignId}
+                platforms={activeCampaigns.find((c) => String(c.id) === pickerCampaignId)?.platforms}
+                onSubmitted={load}
+              />
             ) : (
               <p className="text-sm text-muted-foreground">Pick a campaign to submit a video to it.</p>
             )}
@@ -148,7 +156,10 @@ function SubmissionCard({
     <li className="space-y-3 rounded-xl border bg-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{s.video_title ?? s.video_url}</p>
+          <p className="flex items-center gap-1.5 text-sm font-medium">
+            {isPlatform(s.platform) && <PlatformIcon platform={s.platform} className="shrink-0" />}
+            <span className="truncate">{s.video_title ?? s.video_url}</span>
+          </p>
           <a
             href={s.video_url}
             target="_blank"

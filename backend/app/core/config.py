@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     # Key for HMAC-hashing identity signals (linked account detection). Raw values are never stored.
     identity_hash_secret: str = "change-me-identity"
 
+    # TikTok Login Kit (Person 3). Stats need the creator's own token; redirect URI must be https.
+    tiktok_client_key: str = ""
+    tiktok_client_secret: str = ""
+    tiktok_redirect_uri: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
@@ -46,7 +51,7 @@ settings = get_settings()
 COMMISSION_RATE = Decimal("0.10")  # flat 10% platform commission on every payout
 MIN_WITHDRAWAL_THB = Decimal("1500.00")  # creator can withdraw once balance >= this
 DEFAULT_MIN_VIEWS = 1000  # round-1 system check: minimum views before admin review (per-campaign override)
-SUPPORTED_SUBMISSION_PLATFORMS = ("youtube",)  # add "tiktok", "instagram" once their APIs are integrated
+SUPPORTED_SUBMISSION_PLATFORMS = ("youtube", "tiktok")  # add "instagram" once its adapter exists
 CURRENCY = "THB"
 
 # Duplicate-clip checker (services/duplicate_check.py). Distances are Hamming distances out of 64 bits.
