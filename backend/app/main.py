@@ -10,6 +10,7 @@ from app.routers import (
     auth,
     campaign_manage,
     campaigns,
+    legal,
     outlook,
     payments,
     platforms,
@@ -56,6 +57,7 @@ app.include_router(youtube.router)
 app.include_router(tiktok.router)
 app.include_router(payments.router)
 app.include_router(admin.router)
+app.include_router(legal.router)
 
 
 @app.get("/api/health", tags=["meta"])
