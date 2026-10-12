@@ -1,7 +1,7 @@
 "use client";
 
 // [PERSON 1] /campaigns/[id] — full campaign page.
-//   Creator:      <SubmitContentForm> from Person 2 (YouTube only for now)
+//   Creator:      <SubmitContentForm> from Person 2, for whichever platforms they've connected (Person 3)
 //   Owner brand:  fund (Person 3) / edit / pause + read-only submissions (Person 2's API)
 //   Guest:        sign-in prompt
 
@@ -38,6 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import type { CampaignDetail, Submission, User } from "@/lib/types";
+import { joinLabels, usePlatforms } from "@/lib/use-platforms";
 import { daysLeft, formatNumber, formatTHB, toNumber } from "@/lib/utils";
 
 const COMMISSION_RATE = 0.1; // backend/app/core/config.py
@@ -170,8 +171,9 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
   );
 }
 
-function CreatorPanel({ campaign, user }: { campaign: CampaignDetail; user: User }) {
+function CreatorPanel({ campaign }: { campaign: CampaignDetail; user: User }) {
   const [submitted, setSubmitted] = useState(false);
+  const { platforms } = usePlatforms();
 
   if (campaign.status !== "active") {
     return (
@@ -182,27 +184,67 @@ function CreatorPanel({ campaign, user }: { campaign: CampaignDetail; user: User
       </Panel>
     );
   }
-  if (!user.youtube_channel_id) {
+  // Platforms this campaign accepts that AdCup can verify right now (Person 3's /api/platforms).
+  const accepted = (platforms ?? []).filter((p) => p.supported && campaign.platforms.includes(p.name));
+  const ready = accepted.filter((p) => p.connected);
+  if (platforms === null) {
     return (
       <Panel title="Submit your video">
-        <p className="text-sm text-muted-foreground">
-          Connect your YouTube channel first — we use it to confirm the video is yours and to track its views.
-        </p>
-        <Button asChild className="w-full">
-          <Link href={routes.settings}>
-            <PlatformIcon platform="youtube" className="size-4" /> Connect YouTube
-          </Link>
-        </Button>
+        <Skeleton className="h-16 rounded-lg" />
       </Panel>
     );
   }
+  if (accepted.length === 0) {
+    return (
+      <Panel title="Submit your video">
+        <p className="text-sm text-muted-foreground">This campaign doesn&apos;t accept any platform we can verify yet.</p>
+      </Panel>
+    );
+  }
+  if (ready.length === 0) {
+    return (
+      <Panel title="Submit your video">
+        <p className="text-sm text-muted-foreground">
+          Connect your {joinLabels(accepted.map((p) => p.account_label))} first — we use it to confirm the video is
+          yours and to track its views.
+        </p>
+        {accepted.map((p) => (
+          <Button key={p.name} asChild className="w-full" variant={p === accepted[0] ? "default" : "outline"}>
+            <Link href={routes.settings}>
+              <PlatformIcon platform={p.name} className="size-4" /> Connect {p.label}
+            </Link>
+          </Button>
+        ))}
+      </Panel>
+    );
+  }
+  const missing = accepted.filter((p) => !p.connected);
   return (
     <Panel title="Submit your video">
       <p className="text-sm text-muted-foreground">
-        Post an original video on your channel <span className="text-foreground">{user.youtube_channel_title}</span>,
-        then paste the link.
+        Post an original video on{" "}
+        {ready.map((p, i) => (
+          <span key={p.name}>
+            {i > 0 && " or "}
+            your {p.label} <span className="text-foreground">{p.account_name}</span>
+          </span>
+        ))}
+        , then paste the link.
       </p>
-      <SubmitContentForm campaignId={campaign.id} onSubmitted={() => setSubmitted(true)} />
+      {missing.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          This campaign also accepts {joinLabels(missing.map((p) => p.label))} —{" "}
+          <Link href={routes.settings} className="underline">
+            connect it in Settings
+          </Link>
+          .
+        </p>
+      )}
+      <SubmitContentForm
+        campaignId={campaign.id}
+        platforms={ready.map((p) => p.name)}
+        onSubmitted={() => setSubmitted(true)}
+      />
       {submitted && (
         <p className="flex items-center gap-2 text-sm text-green-400">
           <CheckCircle2 className="size-4" /> Submitted!{" "}
