@@ -1,20 +1,22 @@
 "use client";
 
-// [PERSON 3] Settings: profile summary + YouTube connect/disconnect.
+// [PERSON 3] Settings: profile summary + YouTube connect/disconnect (+ payout account, linked account detection).
 // Connect: GET /api/youtube/connect -> redirect to Google -> backend callback -> back here with
 // ?youtube=<result>, which we turn into a toast and then strip from the URL.
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle2, ExternalLink, Loader2, ShieldCheck, Unlink } from "lucide-react";
+import { CheckCircle2, ExternalLink, Landmark, Loader2, ShieldCheck, Unlink } from "lucide-react";
 import { toast } from "sonner";
 
 import { PlatformIcon } from "@/components/campaign/platform-icon";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/api";
-import type { User } from "@/lib/types";
+import type { PayoutMethod, PayoutMethodResponse, User } from "@/lib/types";
 
 const callbackMessages: Record<string, { ok: boolean; text: string }> = {
   connected: { ok: true, text: "YouTube channel connected" },
@@ -64,7 +66,10 @@ export function SettingsView() {
       </section>
 
       {user.role === "creator" ? (
-        <YouTubeCard user={user} onChange={refresh} />
+        <>
+          <YouTubeCard user={user} onChange={refresh} />
+          <PayoutAccountCard />
+        </>
       ) : (
         <section className="rounded-xl border border-dashed bg-card p-5 text-sm text-muted-foreground">
           YouTube linking is only needed for creator accounts.
@@ -170,6 +175,175 @@ function YouTubeCard({ user, onChange }: { user: User; onChange: () => Promise<v
         </>
       )}
     </section>
+  );
+}
+
+// Linked account detection: where payouts go. Required before the first submission; the backend
+// only ever returns a masked number.
+function PayoutAccountCard() {
+  const [data, setData] = useState<PayoutMethodResponse | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [method, setMethod] = useState<PayoutMethod>("promptpay");
+  const [promptpayId, setPromptpayId] = useState("");
+  const [bankCode, setBankCode] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
+
+  useEffect(() => {
+    api<PayoutMethodResponse>("/api/payout-method")
+      .then((res) => {
+        setData(res);
+        setEditing(!res.account);
+      })
+      .catch((err) => toast.error(`Could not load payout account: ${(err as Error).message}`));
+  }, []);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const body =
+        method === "promptpay"
+          ? { method, promptpay_id: promptpayId, account_name: accountName }
+          : { method, bank_code: bankCode, account_number: accountNumber, account_name: accountName };
+      const res = await api<PayoutMethodResponse>("/api/payout-method", { method: "PUT", body });
+      setData(res);
+      setEditing(false);
+      setPromptpayId("");
+      setAccountNumber("");
+      toast.success("Payout account saved");
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const account = data?.account;
+  const bankName = (code: string | null) => data?.banks.find((b) => b.code === code)?.name ?? code;
+
+  return (
+    <section className="space-y-4 rounded-xl border bg-card p-5">
+      <div className="flex items-center gap-2">
+        <Landmark className="size-5 text-primary" />
+        <h2 className="font-semibold">Payout account</h2>
+        {account && (
+          <Badge variant="success" className="ml-auto">
+            <CheckCircle2 /> Set up
+          </Badge>
+        )}
+      </div>
+
+      {!data ? (
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      ) : account && !editing ? (
+        <>
+          <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 p-3">
+            <div className="min-w-0">
+              <p className="truncate font-medium">{account.account_name}</p>
+              <p className="truncate text-sm text-muted-foreground">
+                {account.method === "promptpay" ? "PromptPay" : bankName(account.bank_code)} · {account.account_masked}
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              Change
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">Your earnings are paid to this account when you cash out.</p>
+        </>
+      ) : (
+        <form onSubmit={save} className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Required before your first submission. Earnings are paid to this account when you cash out.
+          </p>
+          <div role="radiogroup" aria-label="Payout method" className="grid grid-cols-2 gap-2">
+            {(["promptpay", "bank"] as const).map((m) => (
+              <Button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={method === m}
+                variant={method === m ? "default" : "outline"}
+                onClick={() => setMethod(m)}
+              >
+                {m === "promptpay" ? "PromptPay" : "Bank account"}
+              </Button>
+            ))}
+          </div>
+          {method === "promptpay" ? (
+            <Field label="PromptPay ID" htmlFor="promptpay-id">
+              <Input
+                id="promptpay-id"
+                inputMode="numeric"
+                placeholder="Phone number or 13-digit ID number"
+                value={promptpayId}
+                onChange={(e) => setPromptpayId(e.target.value)}
+                required
+              />
+            </Field>
+          ) : (
+            <>
+              <Field label="Bank">
+                <Select value={bankCode} onValueChange={setBankCode}>
+                  <SelectTrigger className="w-full" aria-label="Bank">
+                    <SelectValue placeholder="Choose a bank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {data.banks.map((b) => (
+                      <SelectItem key={b.code} value={b.code}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Account number" htmlFor="account-number">
+                <Input
+                  id="account-number"
+                  inputMode="numeric"
+                  placeholder="10–12 digits"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  required
+                />
+              </Field>
+            </>
+          )}
+          <Field label="Account name" htmlFor="account-name">
+            <Input
+              id="account-name"
+              placeholder="Name on the account"
+              value={accountName}
+              onChange={(e) => setAccountName(e.target.value)}
+              required
+              minLength={2}
+            />
+          </Field>
+          <div className="flex justify-end gap-2">
+            {account && (
+              <Button type="button" variant="ghost" onClick={() => setEditing(false)} disabled={busy}>
+                Cancel
+              </Button>
+            )}
+            <Button type="submit" disabled={busy || (method === "bank" && !bankCode)}>
+              {busy && <Loader2 className="animate-spin" />} Save payout account
+            </Button>
+          </div>
+        </form>
+      )}
+    </section>
+  );
+}
+
+function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={htmlFor} className="text-sm font-medium">
+        {label}
+      </label>
+      {children}
+    </div>
   );
 }
 

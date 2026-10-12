@@ -14,6 +14,21 @@ export interface User {
   created_at: string;
 }
 
+// Creator payout account (GET/PUT /api/payout-method). Only a masked number ever comes back.
+export type PayoutMethod = "promptpay" | "bank";
+
+export interface PayoutAccount {
+  method: PayoutMethod;
+  bank_code: string | null;
+  account_masked: string;
+  account_name: string;
+}
+
+export interface PayoutMethodResponse {
+  account: PayoutAccount | null;
+  banks: { code: string; name: string }[];
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: "bearer";
