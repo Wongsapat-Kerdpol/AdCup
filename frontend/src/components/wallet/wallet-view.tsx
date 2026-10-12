@@ -5,7 +5,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowDownLeft, ArrowUpRight, Banknote, Loader2, Lock, Percent, TrendingUp, Wallet as WalletIcon } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Banknote,
+  Clock,
+  Loader2,
+  Lock,
+  Percent,
+  TrendingUp,
+  Wallet as WalletIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/components/providers/auth-provider";
@@ -85,7 +95,18 @@ export function WalletView() {
           </div>
           <div className="text-4xl font-bold tracking-tight">{formatTHB(balance)}</div>
 
-          {wallet.can_withdraw ? (
+          {wallet.withdrawals_on_hold ? (
+            // Linked account detection: the reason is never shown to the creator (spec D16).
+            <div className="space-y-3">
+              <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                <Clock className="mt-0.5 size-4 shrink-0 text-amber-400" />
+                <p>Withdrawals are on hold while we review your account. This usually takes 1–2 days.</p>
+              </div>
+              <Button disabled>
+                <Banknote /> Cash out
+              </Button>
+            </div>
+          ) : wallet.can_withdraw ? (
             <div className="space-y-2">
               <label htmlFor="amount" className="text-sm font-medium">
                 Cash out amount (THB)
