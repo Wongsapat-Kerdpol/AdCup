@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     google_redirect_uri: str = "http://localhost:8000/api/youtube/callback"
     youtube_api_key: str = ""  # public video stats (videos.list); OAuth is only for channel ownership
 
+    # Key for HMAC-hashing identity signals (linked account detection). Raw values are never stored.
+    identity_hash_secret: str = "change-me-identity"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
