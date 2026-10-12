@@ -12,6 +12,7 @@ from app.routers import (
     campaigns,
     outlook,
     payments,
+    payout_method,
     review,
     settlement,
     submissions,
@@ -52,6 +53,8 @@ app.include_router(settlement.router)
 app.include_router(youtube.router)
 app.include_router(payments.router)
 app.include_router(admin.router)
+# Linked account detection
+app.include_router(payout_method.router)
 
 
 @app.get("/api/health", tags=["meta"])

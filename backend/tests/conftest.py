@@ -25,7 +25,7 @@ from app.core.security import hash_password
 from app.models.campaign import Campaign, CampaignCategory, CampaignStatus
 from app.models.submission import Submission, SubmissionStatus
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
-from app.models.user import User, UserRole
+from app.models.user import PayoutMethod, User, UserRole
 from app.services import youtube as yt
 
 
@@ -76,6 +76,11 @@ def make_user(db):
 
     def _make(role: UserRole = UserRole.creator, **kwargs) -> User:
         n = next(counter)
+        if role == UserRole.creator and "payout_method" not in kwargs:
+            # Creators need a payout account before submitting (linked account detection, spec D8).
+            # Display fields only: no identity signal, so test accounts stay unlinked.
+            # Pass payout_method=None for a creator who hasn't set one up.
+            kwargs.update(payout_method=PayoutMethod.promptpay, payout_account_masked="••• 0000", payout_account_name="Test")
         user = User(
             email=kwargs.pop("email", f"{role.value}{n}@test.dev"),
             password_hash=hash_password("password123"),

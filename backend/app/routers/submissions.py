@@ -1,7 +1,8 @@
 """[PERSON 2] Content submission (creator side) + read-only views for brands.
 
   POST /api/submissions                   — creator submits a YouTube link for a campaign
-                                             (creator only; campaign must be active; must have connected YouTube)
+                                             (creator only; campaign must be active; must have connected YouTube
+                                              and set up a payout account)
                                              -> save with status=pending, external_video_id=extract_video_id(url)
                                              -> run services.verification.run_system_check()
   GET  /api/submissions/mine              — creator's submissions: status, rejection reason, views,
@@ -32,6 +33,7 @@ from app.services.verification import run_system_check
 router = APIRouter(prefix="/api/submissions", tags=["submissions (Person 2)"])
 
 PLATFORM = "youtube"  # only platform wired up end-to-end for now
+PAYOUT_ACCOUNT_REQUIRED = "Set up your payout account in Settings first"  # the frontend matches this text
 
 
 @router.post("", response_model=SubmissionSchema)
@@ -52,6 +54,8 @@ def create_submission(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Connect your YouTube channel in Settings first"
         )
+    if user.payout_method is None:  # linked account detection, spec D8 (see routers/payout_method.py)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PAYOUT_ACCOUNT_REQUIRED)
 
     video_id = yt.extract_video_id(body.video_url)
     if video_id is None:
