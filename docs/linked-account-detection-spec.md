@@ -472,6 +472,7 @@ group_id ของแต่ละกลุ่ม = id ที่น้อยท�
 | 2026-10-12 | เขียน spec (session วิเคราะห์เดิม) | ยังไม่เริ่ม | เริ่ม Phase 0 ใน repo ใหม่ |
 | 2026-10-12 | clone repo ลง `project_AdCup_101226` · สร้าง branch `feature/linked-accounts` จาก `main` (`ce0868a`) · commit spec นี้ · push branch | Phase 0 ยังไม่เริ่ม | session ใหม่: เริ่ม Phase 0 (ดู `START-HERE.md` ที่ root ของโฟลเดอร์) |
 | 2026-10-12 | Phase 0: สร้าง `.env` · `docker compose up -d --build` · baseline 46 passed · เขียนผลสำรวจข้อ 2.3 · เพิ่ม Q6–Q8 | Phase 0 เสร็จ รอเจ้าของงานยืนยัน | ตอบ Q2–Q8 แล้วเริ่ม Phase 1 |
+| 2026-10-12 | Phase 1: models ครบทุกตาราง/คอลัมน์ของ feature (`models/identity.py`, คอลัมน์ใหม่ใน `User`) · `IDENTITY_HASH_SECRET` · `services/identity.py` (normalize + HMAC + upsert) · เก็บสัญญาณที่ register / login / YouTube callback (scope `openid`, เก็บแม้ `channel_taken`) / ส่งงาน (device) / ถอน · `X-Device-Id` ใน `lib/api.ts` · `tests/test_identity.py` · รีเซ็ต DB ของแอปแล้ว (เจ้าของงานอนุญาต) | Phase 1 เสร็จ: **71 passed** · ทดสอบผ่าน HTTP: creator ได้ signal 3 แถว, login อัปเดต `last_seen_at`, brand ไม่มี signal · browser ส่ง device ID ผ่าน CORS ได้ | เริ่ม Phase 2 (ไม่ต้องรีเซ็ต DB อีก เพราะ schema ใส่ครบแล้ว) · การ route รับ `request: Request = None` เป็น parameter ท้ายสุด (FastAPI ไม่รับ `Request \| None`) |
 
 ---
 
