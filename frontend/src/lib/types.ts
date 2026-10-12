@@ -202,6 +202,30 @@ export interface AdminStats {
   }[];
 }
 
+// Anti-fraud — duplicate-clip warnings (GET /api/admin/duplicates/{submission_id})
+export interface DuplicateMatch {
+  submission_id: number;
+  campaign_title: string;
+  creator_name: string;
+  video_url: string;
+  matched_pictures: number;
+  total_pictures: number;
+  similarity: number; // 0..1
+  closest_distance: number; // Hamming distance out of 64 bits
+  mirrored: boolean;
+  level: "copy" | "check";
+}
+
+export interface DuplicateReport {
+  enabled: boolean;
+  status: "ok" | "no_pictures" | "unavailable" | "disabled";
+  pictures_checked: number;
+  level: "copy" | "check" | null;
+  matches: DuplicateMatch[];
+  comparisons: number;
+  linear_comparisons: number;
+}
+
 export interface Paginated<T> {
   items: T[];
   total: number;

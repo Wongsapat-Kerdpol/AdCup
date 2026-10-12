@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     google_redirect_uri: str = "http://localhost:8000/api/youtube/callback"
     youtube_api_key: str = ""  # public video stats (videos.list); OAuth is only for channel ownership
 
+    # Duplicate-clip checker (dHash + BK-Tree). Turn off to hide the warnings without touching code.
+    enable_anti_fraud: bool = True
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
@@ -42,3 +45,8 @@ MIN_WITHDRAWAL_THB = Decimal("1500.00")  # creator can withdraw once balance >= 
 DEFAULT_MIN_VIEWS = 1000  # round-1 system check: minimum views before admin review (per-campaign override)
 SUPPORTED_SUBMISSION_PLATFORMS = ("youtube",)  # add "tiktok", "instagram" once their APIs are integrated
 CURRENCY = "THB"
+
+# Duplicate-clip checker (services/duplicate_check.py). Distances are Hamming distances out of 64 bits.
+DUPLICATE_MATCH_RADIUS = 8  # a picture "matches" an old one when they differ by at most this many bits
+DUPLICATE_NEAR_EXACT = 3  # "almost identical" picture -> yellow "Should check" warning
+DUPLICATE_COPY_RATIO = 0.6  # share of pictures matching one old clip -> red "Probably a copy" warning

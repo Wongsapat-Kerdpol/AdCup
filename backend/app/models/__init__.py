@@ -4,6 +4,7 @@ from app.models.campaign import Campaign, CampaignCategory, CampaignStatus, Plat
 from app.models.submission import RejectedBy, Submission, SubmissionStatus
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.models.user import User, UserRole
+from app.models.video_hash import VideoHash
 
 __all__ = [
     "Campaign",
@@ -18,4 +19,5 @@ __all__ = [
     "TransactionType",
     "User",
     "UserRole",
+    "VideoHash",
 ]

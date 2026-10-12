@@ -10,6 +10,7 @@ from app.routers import (
     auth,
     campaign_manage,
     campaigns,
+    duplicates,
     outlook,
     payments,
     review,
@@ -42,6 +43,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(campaigns.router)
 app.include_router(outlook.router)
+app.include_router(duplicates.router)  # anti-fraud: duplicate-clip warnings
 # Person 1
 app.include_router(campaign_manage.router)
 # Person 2

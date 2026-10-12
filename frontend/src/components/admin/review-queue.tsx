@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ClipboardList, Loader2, ThumbsDown, ThumbsUp, User, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
+import { DuplicateWarning } from "@/components/admin/duplicate-warning";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -120,6 +121,8 @@ export function ReviewQueue() {
                   </a>
                 )}
               </div>
+
+              <DuplicateWarning submissionId={s.id} />
 
               {rejectingId === s.id ? (
                 <div className="space-y-2">
