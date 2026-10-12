@@ -16,12 +16,12 @@ import { routes } from "@/lib/routes";
 import type { Campaign, CampaignCategory } from "@/lib/types";
 import { cn, formatTHB } from "@/lib/utils";
 
-// `swatch` is the plain cover color shown when the brand didn't upload a thumbnail.
-export const categoryMeta: Record<CampaignCategory, { label: string; icon: LucideIcon; swatch: string }> = {
-  logo: { label: "Logo", icon: Sparkles, swatch: "bg-violet-100" },
-  music: { label: "Music", icon: Disc3, swatch: "bg-rose-100" },
-  clipping: { label: "Clipping", icon: Scissors, swatch: "bg-sky-100" },
-  ugc: { label: "UGC", icon: Film, swatch: "bg-emerald-100" },
+// `swatch` + `ink` are the cover color and category icon color shown when the brand didn't upload a thumbnail.
+export const categoryMeta: Record<CampaignCategory, { label: string; icon: LucideIcon; swatch: string; ink: string }> = {
+  logo: { label: "Logo", icon: Sparkles, swatch: "bg-violet-100", ink: "text-violet-500/70" },
+  music: { label: "Music", icon: Disc3, swatch: "bg-rose-100", ink: "text-rose-500/70" },
+  clipping: { label: "Clipping", icon: Scissors, swatch: "bg-sky-100", ink: "text-sky-500/70" },
+  ugc: { label: "UGC", icon: Film, swatch: "bg-emerald-100", ink: "text-emerald-600/70" },
 };
 
 function progressColor(percent: number) {
@@ -30,13 +30,23 @@ function progressColor(percent: number) {
   return "bg-progress-ok";
 }
 
-/** The brand's own thumbnail, or a plain color block. Fills its parent. */
+/** The brand's own thumbnail, or a color block with the category icon. Fills its parent. */
 function Cover({ campaign }: { campaign: Campaign }) {
   return campaign.thumbnail_url ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={campaign.thumbnail_url} alt="" className="size-full object-cover" />
   ) : (
-    <div className={cn("size-full", categoryMeta[campaign.category].swatch)} />
+    <CategoryCover category={campaign.category} />
+  );
+}
+
+function CategoryCover({ category }: { category: CampaignCategory }) {
+  const meta = categoryMeta[category];
+  return (
+    <div className={cn("flex size-full items-center justify-center", meta.swatch)}>
+      {/* Scales with the cover: big on Discover cards, small in the square thumbnail. */}
+      <meta.icon className={cn("aspect-square h-[36%] w-auto", meta.ink)} strokeWidth={1.5} aria-hidden />
+    </div>
   );
 }
 
