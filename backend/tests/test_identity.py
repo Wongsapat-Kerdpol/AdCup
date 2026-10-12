@@ -182,20 +182,36 @@ def test_scope_asks_for_openid():
     assert "openid" in yt._SCOPE.split()
 
 
-def test_callback_records_google_sub_even_when_the_channel_is_taken(db, make_user, monkeypatch):
-    make_user(UserRole.creator, youtube_channel_id="chan-1")  # owner of the channel
-    other = make_user(UserRole.creator)
+def _connect(db, monkeypatch, user, granted: str):
+    """Run the OAuth callback for `user` as if Google granted the scopes in `granted`."""
     state = jwt.encode(
-        {"sub": str(other.id), "purpose": "youtube_connect", "exp": datetime.now(timezone.utc) + timedelta(minutes=5)},
+        {"sub": str(user.id), "purpose": "youtube_connect", "exp": datetime.now(timezone.utc) + timedelta(minutes=5)},
         settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
     )
     id_token = jwt.encode({"sub": "google-42"}, "k", algorithm="HS256")
-    monkeypatch.setattr(yt, "exchange_code", lambda code: {"access_token": "a", "id_token": id_token})
+    tokens = {"access_token": "a", "id_token": id_token, "scope": granted}
+    monkeypatch.setattr(yt, "exchange_code", lambda code: tokens)
     monkeypatch.setattr(yt, "get_my_channel", lambda token: yt.ChannelInfo(channel_id="chan-1", title="Taken"))
+    return callback(code="c", state=state, error=None, db=db).headers["location"]
 
-    response = callback(code="c", state=state, error=None, db=db)
 
-    assert "channel_taken" in response.headers["location"]
+def test_callback_records_google_sub_even_when_the_channel_is_taken(db, make_user, monkeypatch):
+    make_user(UserRole.creator, youtube_channel_id="chan-1")  # owner of the channel
+    other = make_user(UserRole.creator)
+
+    location = _connect(db, monkeypatch, other, granted=f"openid {yt._YOUTUBE_SCOPE}")
+
+    assert "channel_taken" in location
     assert other.youtube_channel_id is None
     assert _signals(db, other)[SignalType.google_sub] == [identity.hash_signal(SignalType.google_sub, "google-42")]
+
+
+def test_callback_without_the_youtube_scope_asks_to_tick_it(db, make_user, monkeypatch):
+    creator = make_user(UserRole.creator)
+
+    location = _connect(db, monkeypatch, creator, granted="openid")  # YouTube box left unticked on Google
+
+    assert "missing_scope" in location
+    assert creator.youtube_channel_id is None
+    assert SignalType.google_sub in _signals(db, creator)  # the Google account is still known

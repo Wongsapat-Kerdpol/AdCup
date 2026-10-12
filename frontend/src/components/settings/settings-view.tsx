@@ -23,6 +23,10 @@ const callbackMessages: Record<string, { ok: boolean; text: string }> = {
   denied: { ok: false, text: "Connection cancelled on Google" },
   no_channel: { ok: false, text: "That Google account has no YouTube channel — create one first or pick another account" },
   channel_taken: { ok: false, text: "That channel is already linked to another AdCup account" },
+  missing_scope: {
+    ok: false,
+    text: "Tick “View your YouTube account” on Google's screen — we need it to confirm your channel",
+  },
   expired: { ok: false, text: "The connect link expired — please try again" },
   error: { ok: false, text: "Could not connect YouTube — please try again" },
 };

@@ -97,8 +97,7 @@ def callback(
 
     try:
         tokens = yt.exchange_code(code)
-        channel = yt.get_my_channel(tokens["access_token"])
-    except (httpx.HTTPError, KeyError):
+    except httpx.HTTPError:
         return _settings_redirect("error")
 
     # Linked account detection: recorded even when the channel is missing or taken below — signing in
@@ -107,6 +106,14 @@ def callback(
     if google_sub and record_signal(db, user, SignalType.google_sub, google_sub):
         rebuild_profile_groups(db)
         db.commit()
+
+    # Google lets the user untick scopes on the consent screen; without YouTube we can't see the channel.
+    if not yt.has_youtube_scope(tokens):
+        return _settings_redirect("missing_scope")
+    try:
+        channel = yt.get_my_channel(tokens["access_token"])
+    except (httpx.HTTPError, KeyError):
+        return _settings_redirect("error")
 
     if channel is None:
         return _settings_redirect("no_channel")

@@ -38,7 +38,8 @@ _TOKEN_URL = "https://oauth2.googleapis.com/token"
 _REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 # openid: the token response then carries an id_token with the Google account id ("sub"),
 # a strong signal for linked account detection (services/identity.py).
-_SCOPE = "openid https://www.googleapis.com/auth/youtube.readonly"
+_YOUTUBE_SCOPE = "https://www.googleapis.com/auth/youtube.readonly"
+_SCOPE = f"openid {_YOUTUBE_SCOPE}"
 
 _ID = r"([A-Za-z0-9_-]{11})"
 _PATTERNS = [
@@ -200,6 +201,12 @@ def google_sub_from(tokens: dict) -> str | None:
         return None
     sub = claims.get("sub")
     return str(sub) if sub else None
+
+
+def has_youtube_scope(tokens: dict) -> bool:
+    """Asking for more than one scope makes Google show a checkbox per scope, so the user may grant
+    openid but not YouTube. The token response lists what was actually granted."""
+    return _YOUTUBE_SCOPE in tokens.get("scope", "").split()
 
 
 def get_my_channel(access_token: str) -> ChannelInfo | None:
