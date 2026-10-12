@@ -255,7 +255,7 @@ function CreatorPanel({ campaign }: { campaign: CampaignDetail; user: User }) {
         onSubmitted={() => setSubmitted(true)}
       />
       {submitted && (
-        <p className="flex items-center gap-2 text-sm text-green-400">
+        <p className="flex items-center gap-2 text-sm text-green-700">
           <CheckCircle2 className="size-4" /> Submitted!{" "}
           <Link href={routes.submissions} className="underline">
             Track it in My Submissions

@@ -114,7 +114,7 @@ export function FundCheckout({ campaignId }: { campaignId: string }) {
 
           {method === "promptpay" ? <MockQr amount={campaign.total_budget} /> : <MockCard />}
 
-          <p className="flex items-start gap-2 rounded-lg bg-amber-500/10 p-3 text-xs text-amber-400">
+          <p className="flex items-start gap-2 rounded-lg bg-amber-500/10 p-3 text-xs text-amber-700">
             <Info className="mt-0.5 size-4 shrink-0" />
             Simulated checkout for the course project — no real money is transferred.
           </p>
@@ -167,7 +167,7 @@ export function FundCheckout({ campaignId }: { campaignId: string }) {
 function Receipt({ campaign, receipt }: { campaign: CampaignDetail; receipt: CheckoutResponse }) {
   return (
     <div className="mx-auto max-w-md space-y-5 py-10 text-center">
-      <CheckCircle2 className="mx-auto size-14 text-green-400" />
+      <CheckCircle2 className="mx-auto size-14 text-green-700" />
       <div className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight">Payment successful</h1>
         <p className="text-sm text-muted-foreground">

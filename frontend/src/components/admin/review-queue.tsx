@@ -195,7 +195,7 @@ function LinkNotices({ submission: s }: { submission: SubmissionForReview }) {
     <div className="space-y-2 text-sm">
       {s.linked_accounts.map((a) => (
         <div key={a.user_id} className="flex items-start gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 p-3">
-          <Link2 className="mt-0.5 size-4 shrink-0 text-rose-400" />
+          <Link2 className="mt-0.5 size-4 shrink-0 text-rose-600" />
           <p>
             <span className="font-semibold">Linked account.</span> Same person as{" "}
             <strong>
@@ -210,7 +210,7 @@ function LinkNotices({ submission: s }: { submission: SubmissionForReview }) {
       ))}
       {overage && (
         <div className="flex items-start gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 p-3">
-          <Link2 className="mt-0.5 size-4 shrink-0 text-rose-400" />
+          <Link2 className="mt-0.5 size-4 shrink-0 text-rose-600" />
           <p>
             This person was paid {overage.amount ? formatTHB(overage.amount) : "more"} over the cap per profile before
             the accounts were linked. {decide}
@@ -219,7 +219,7 @@ function LinkNotices({ submission: s }: { submission: SubmissionForReview }) {
       )}
       {suspected.map((f) => (
         <div key={f.id} className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-400" />
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-700" />
           <p>
             Possible link with{" "}
             <strong>

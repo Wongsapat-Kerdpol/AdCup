@@ -99,7 +99,7 @@ export function WalletView() {
             // Linked account detection: the reason is never shown to the creator (spec D16).
             <div className="space-y-3">
               <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-                <Clock className="mt-0.5 size-4 shrink-0 text-amber-400" />
+                <Clock className="mt-0.5 size-4 shrink-0 text-amber-700" />
                 <p>Withdrawals are on hold while we review your account. This usually takes 1–2 days.</p>
               </div>
               <Button disabled>
@@ -209,7 +209,7 @@ function TransactionRow({ tx }: { tx: WalletTransaction }) {
       <div
         className={cn(
           "flex size-9 shrink-0 items-center justify-center rounded-full",
-          incoming ? "bg-green-500/15 text-green-400" : "bg-muted text-muted-foreground",
+          incoming ? "bg-green-500/15 text-green-700" : "bg-muted text-muted-foreground",
         )}
       >
         {incoming ? <ArrowDownLeft className="size-4" /> : <ArrowUpRight className="size-4" />}
@@ -219,7 +219,7 @@ function TransactionRow({ tx }: { tx: WalletTransaction }) {
         <p className="truncate text-xs text-muted-foreground">{details.join(" · ")}</p>
       </div>
       <div className="shrink-0 text-right">
-        <p className={cn("text-sm font-semibold", incoming && "text-green-400")}>
+        <p className={cn("text-sm font-semibold", incoming && "text-green-700")}>
           {incoming ? "+" : "−"}
           {formatTHB(tx.net_amount)}
         </p>
@@ -228,7 +228,7 @@ function TransactionRow({ tx }: { tx: WalletTransaction }) {
             {formatTHB(tx.gross_amount)} − {formatTHB(tx.commission_amount)} fee
           </p>
         )}
-        {tx.status !== "completed" && <p className="text-xs text-amber-400">{tx.status}</p>}
+        {tx.status !== "completed" && <p className="text-xs text-amber-700">{tx.status}</p>}
       </div>
     </li>
   );

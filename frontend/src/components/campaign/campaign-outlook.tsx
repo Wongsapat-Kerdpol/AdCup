@@ -114,7 +114,7 @@ export function CampaignOutlookCard({ campaignId }: { campaignId: number }) {
           <span className="text-right">
             <span className="text-xl font-bold">{formatTHB(n.expected_net)}</span>
             {fill !== null && (
-              <span className={cn("block text-xs", fill >= 95 ? "text-green-400" : fill >= 60 ? "text-amber-400" : "text-red-400")}>
+              <span className={cn("block text-xs", fill >= 95 ? "text-green-700" : fill >= 60 ? "text-amber-700" : "text-red-600")}>
                 {fill}% of what it earns gets paid
               </span>
             )}
