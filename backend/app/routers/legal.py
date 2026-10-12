@@ -41,6 +41,17 @@ videos' statistics, and, for videos you submit, their title, publish date and vi
 <p>Only to run AdCup: confirm that a submitted video belongs to you, track its views, and calculate
 earnings. Tokens are never shown in the app or shared with anyone. We only request read-only access
 and never post, edit or delete anything on your accounts.</p>
+<h2>Payouts and preventing duplicate accounts</h2>
+<p>Creators add a payout account (PromptPay or bank account) before their first submission, so earnings
+can be paid out when they cash out. To stop one person from opening several accounts to get around a
+campaign's cap per creator, we also record: your payout account, your normalized email address, the id
+of the Google account you connect for YouTube, the IP address of some requests (sign-up, sign-in,
+cash-out), and a random device id that your browser keeps for AdCup.</p>
+<p>None of these are stored as you typed them: each is kept only as a one-way keyed hash (HMAC), so it
+can be compared with other accounts but not turned back into the original value. Your payout account is
+shown only masked (for example ••• 5678). Accounts that clearly belong to the same person share one cap
+per creator; if accounts only look similar (for example the same device), an admin reviews them and
+cash-out may be paused until then. Admins see which kind of signal matched, never the values.</p>
 <h2>Your choices</h2>
 <p>Disconnect a platform in Settings at any time; this deletes its stored tokens and revokes our
 access with that platform. You can also revoke access from the platform's own app settings.</p>
