@@ -16,11 +16,12 @@ from app.core.config import SUPPORTED_SUBMISSION_PLATFORMS
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User
 from app.services.platforms.base import PlatformAdapter, PlatformError, VideoStats
+from app.services.platforms.tiktok import TikTokAdapter
 from app.services.platforms.youtube import YouTubeAdapter
 
 __all__ = ["PlatformAdapter", "PlatformError", "VideoStats", "ADAPTERS", "get_adapter", "detect", "refresh_views"]
 
-ADAPTERS: dict[str, PlatformAdapter] = {a.name: a for a in (YouTubeAdapter(),)}
+ADAPTERS: dict[str, PlatformAdapter] = {a.name: a for a in (YouTubeAdapter(), TikTokAdapter())}
 
 
 def get_adapter(name: str) -> PlatformAdapter | None:

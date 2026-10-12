@@ -75,6 +75,8 @@ def run_system_check(db: Session, submission: Submission) -> None:
     # 2) video exists, is public
     info = adapter.fetch_video(db, creator, submission.external_video_id) if submission.external_video_id else None
     if info is None:
+        if adapter.stats_need_user_token:  # the API only shows the creator's own public videos
+            return reject(f"Video not found on your connected {adapter.account_label}, or it isn't public")
         return reject("Video not found or is private")
 
     # Store the latest known data regardless of outcome — the admin queue needs it.

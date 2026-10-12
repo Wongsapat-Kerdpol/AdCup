@@ -16,6 +16,7 @@ from app.routers import (
     review,
     settlement,
     submissions,
+    tiktok,
     youtube,
 )
 from app.seed import seed_if_empty
@@ -52,6 +53,7 @@ app.include_router(settlement.router)
 # Person 3
 app.include_router(platforms.router)
 app.include_router(youtube.router)
+app.include_router(tiktok.router)
 app.include_router(payments.router)
 app.include_router(admin.router)
 
