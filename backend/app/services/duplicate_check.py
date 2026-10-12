@@ -20,6 +20,8 @@ import io
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
+from decimal import Decimal
 
 import httpx
 from PIL import Image
@@ -177,9 +179,15 @@ def backfill(db: Session, index: DuplicateIndex, fetch: FrameFetcher, limit: int
 @dataclass
 class Match:
     submission_id: int
+    campaign_id: int
     campaign_title: str
     creator_name: str
     video_url: str
+    status: str  # the other clip's review status
+    submitted_at: datetime
+    net_paid: Decimal  # what the other clip has already earned
+    submitted_earlier: bool  # sent before this clip -> most likely the original
+    days_apart: float  # |difference| between the two submission times, in days
     matched_pictures: int
     total_pictures: int
     similarity: float  # 0..1
@@ -238,19 +246,39 @@ def check_submission(
     details = {}
     if flagged:
         rows = db.execute(
-            select(Submission.id, Submission.video_url, Campaign.title, User.display_name)
+            select(
+                Submission.id,
+                Submission.video_url,
+                Submission.campaign_id,
+                Submission.status,
+                Submission.created_at,
+                Submission.net_amount,
+                Campaign.title,
+                User.display_name,
+            )
             .join(Campaign, Campaign.id == Submission.campaign_id)
             .join(User, User.id == Submission.creator_id)
             .where(Submission.id.in_(list(flagged)), Submission.status != SubmissionStatus.rejected)
         ).all()
         details = {r.id: r for r in rows}
 
+    def _apart(other_id: int, other_at: datetime) -> tuple[bool, float]:
+        """(was the other clip sent first?, days between the two). Same time -> lower id came first."""
+        earlier = (other_at, other_id) < (submission.created_at, submission.id)
+        return earlier, round(abs((submission.created_at - other_at).total_seconds()) / 86400, 1)
+
     matches = [
         Match(
             submission_id=owner,
+            campaign_id=details[owner].campaign_id,
             campaign_title=details[owner].title,
             creator_name=details[owner].display_name,
             video_url=details[owner].video_url,
+            status=details[owner].status.value,
+            submitted_at=details[owner].created_at,
+            net_paid=details[owner].net_amount,
+            submitted_earlier=_apart(owner, details[owner].created_at)[0],
+            days_apart=_apart(owner, details[owner].created_at)[1],
             matched_pictures=len(hit["pictures"]),
             total_pictures=total,
             similarity=round(similarity, 3),
@@ -261,9 +289,11 @@ def check_submission(
         for owner, (hit, similarity, level) in flagged.items()
         if owner in details
     ]
-    # SORT: red before yellow, then most similar, then closest picture
+    # SORT: red before yellow, then most similar, then closest picture, then sent earlier (the likely original)
     matches = merge_sort(
-        matches, key=lambda x: (x.level == "copy", x.similarity, -x.closest_distance), descending=True
+        matches,
+        key=lambda x: (x.level == "copy", x.similarity, -x.closest_distance, x.submitted_earlier),
+        descending=True,
     )
     level = "copy" if any(m.level == "copy" for m in matches) else ("check" if matches else None)
     return Report("ok", total, level, matches, comparisons, linear)

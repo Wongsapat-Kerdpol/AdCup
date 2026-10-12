@@ -115,6 +115,8 @@ def test_brightened_reupload_is_probably_a_copy(setup):
     report = check(copy)
     assert report.level == "copy"
     assert report.matches[0].submission_id == original.id
+    assert report.matches[0].submitted_earlier  # the original was sent first
+    assert report.matches[0].campaign_id == original.campaign_id
     # +30% brightness pushes some flat areas to pure white, which can move one picture past the
     # 8-bit radius (picture 10 moves 12 bits) — the other 3 still match, so it is still a "copy".
     assert report.matches[0].similarity >= 0.75
@@ -170,3 +172,41 @@ def test_plain_frames_are_skipped(setup):
     report = check(submit("blak0000002", [black, picture(41)]))
     assert report.pictures_checked == 1
     assert report.matches == []
+
+
+# --- admin submissions API ------------------------------------------------------------------------
+
+
+def _token(user):
+    from app.core.security import create_access_token
+
+    return {"Authorization": f"Bearer {create_access_token(user.id, user.role.value)}"}
+
+
+def test_admin_sees_who_submitted(db, make_user, make_campaign, make_submission):
+    from fastapi.testclient import TestClient
+
+    from app.core.database import get_db
+    from app.main import app
+
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        client = TestClient(app)
+        admin, brand = make_user(UserRole.admin), make_user(UserRole.brand)
+        creator = make_user(UserRole.creator, youtube_channel_id="UC123", youtube_channel_title="Mint Channel")
+        campaign = make_campaign(brand)
+        sub = make_submission(campaign, creator, status=SubmissionStatus.approved)
+
+        rows = client.get(f"/api/admin/campaigns/{campaign.id}/submissions", headers=_token(admin)).json()
+        assert rows[0]["creator_name"] == creator.display_name
+        assert rows[0]["youtube_channel_title"] == "Mint Channel"
+        assert "creator_email" not in rows[0]  # the list stays light; email is in the details
+
+        detail = client.get(f"/api/admin/submissions/{sub.id}", headers=_token(admin)).json()
+        assert detail["creator_email"] == creator.email
+
+        for who in (brand, creator):  # admins only
+            assert client.get(f"/api/admin/campaigns/{campaign.id}/submissions", headers=_token(who)).status_code == 403
+            assert client.get(f"/api/admin/submissions/{sub.id}", headers=_token(who)).status_code == 403
+    finally:
+        app.dependency_overrides.clear()

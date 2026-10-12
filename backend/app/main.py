@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.routers import (
     admin,
+    admin_submissions,
     auth,
     campaign_manage,
     campaigns,
@@ -44,6 +45,7 @@ app.include_router(auth.router)
 app.include_router(campaigns.router)
 app.include_router(outlook.router)
 app.include_router(duplicates.router)  # anti-fraud: duplicate-clip warnings
+app.include_router(admin_submissions.router)  # admins: who submitted what, per campaign
 # Person 1
 app.include_router(campaign_manage.router)
 # Person 2

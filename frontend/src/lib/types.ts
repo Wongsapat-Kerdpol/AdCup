@@ -205,9 +205,15 @@ export interface AdminStats {
 // Anti-fraud — duplicate-clip warnings (GET /api/admin/duplicates/{submission_id})
 export interface DuplicateMatch {
   submission_id: number;
+  campaign_id: number;
   campaign_title: string;
   creator_name: string;
   video_url: string;
+  status: SubmissionStatus;
+  submitted_at: string;
+  net_paid: string;
+  submitted_earlier: boolean; // sent before the clip being reviewed -> most likely the original
+  days_apart: number;
   matched_pictures: number;
   total_pictures: number;
   similarity: number; // 0..1
@@ -224,6 +230,42 @@ export interface DuplicateReport {
   matches: DuplicateMatch[];
   comparisons: number;
   linear_comparisons: number;
+}
+
+// Admin — who submitted what (GET /api/admin/campaigns/{id}/submissions, /api/admin/submissions/{id})
+export interface AdminSubmissionRow {
+  id: number;
+  campaign_id: number;
+  creator_id: number;
+  creator_name: string;
+  youtube_channel_id: string | null;
+  youtube_channel_title: string | null;
+  video_url: string;
+  external_video_id: string | null;
+  video_title: string | null;
+  status: SubmissionStatus;
+  submitted_at: string;
+  view_count: number;
+  gross_amount: string;
+  net_amount: string;
+}
+
+export interface AdminSubmissionDetail extends AdminSubmissionRow {
+  campaign_title: string;
+  creator_email: string;
+  creator_joined_at: string;
+  creator_submissions: number;
+  creator_net_earned: string;
+  video_channel_id: string | null;
+  video_published_at: string | null;
+  views_refreshed_at: string | null;
+  paid_views: number;
+  commission_amount: string;
+  system_checked_at: string | null;
+  reviewed_at: string | null;
+  approved_at: string | null;
+  rejected_by: RejectedBy | null;
+  rejection_reason: string | null;
 }
 
 export interface Paginated<T> {

@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { AdminCampaignSubmissions } from "@/components/admin/admin-campaign-submissions";
 import { CampaignThumbnail, categoryMeta } from "@/components/campaign/campaign-card";
 import { CampaignOutlookCard } from "@/components/campaign/campaign-outlook";
 import { CampaignStatusBadge } from "@/components/campaign/campaign-status-badge";
@@ -123,6 +124,8 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-6">
+          {user?.role === "admin" && <AdminCampaignSubmissions campaignId={campaign.id} />}
+
           <Section title="About this campaign">
             <p className="text-sm leading-relaxed whitespace-pre-line text-muted-foreground">{campaign.description}</p>
           </Section>

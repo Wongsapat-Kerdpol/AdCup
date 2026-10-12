@@ -5,11 +5,15 @@
 // It only warns; the admin still decides.
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ExternalLink, FlipHorizontal, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, ArrowRight, ExternalLink, FlipHorizontal, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
 
+import { SubmissionStatusBadge } from "@/components/campaign/submission-status-badge";
+import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { routes } from "@/lib/routes";
 import type { DuplicateMatch, DuplicateReport } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, formatTHB } from "@/lib/utils";
 
 const levelStyle = {
   copy: {
@@ -86,30 +90,58 @@ export function DuplicateWarning({ submissionId }: { submissionId: number }) {
   );
 }
 
+function sentWhen(m: DuplicateMatch) {
+  const order = m.submitted_earlier ? "earlier" : "later";
+  if (m.days_apart < 1) return `sent ${order} the same day`;
+  return `sent ${m.days_apart} day${m.days_apart === 1 ? "" : "s"} ${order}`;
+}
+
 function MatchRow({ match: m }: { match: DuplicateMatch }) {
   const style = levelStyle[m.level];
   return (
-    <li className="flex items-center justify-between gap-3 text-xs">
-      <span className="min-w-0">
-        <span className={cn("font-semibold", style.text)}>{Math.round(m.similarity * 100)}% similar</span>{" "}
+    <li className="space-y-1.5 rounded-md bg-background/40 p-2.5 text-xs">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className={cn("font-semibold", style.text)}>{Math.round(m.similarity * 100)}% similar</span>
         <span className="text-muted-foreground">
-          to clip #{m.submission_id} by {m.creator_name} · {m.campaign_title} · {m.matched_pictures}/{m.total_pictures}{" "}
-          pictures, closest {m.closest_distance} bits
+          {m.matched_pictures}/{m.total_pictures} pictures · closest {m.closest_distance} bits
         </span>
         {m.mirrored && (
-          <span className="ml-1 inline-flex items-center gap-0.5 text-muted-foreground">
+          <span className="inline-flex items-center gap-0.5 text-muted-foreground">
             <FlipHorizontal className="size-3" /> mirrored
           </span>
         )}
-      </span>
-      <a
-        href={m.video_url}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex shrink-0 items-center gap-1 text-muted-foreground hover:text-foreground"
-      >
-        Open <ExternalLink className="size-3" />
-      </a>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0 space-y-0.5">
+          <p>
+            <span className="font-semibold">
+              {m.submitted_earlier ? "Likely original:" : "Similar clip (sent after this one):"}
+            </span>{" "}
+            clip #{m.submission_id} by <span className="font-medium">{m.creator_name}</span>
+          </p>
+          <p className="flex flex-wrap items-center gap-1.5 text-muted-foreground">
+            {m.campaign_title} · {sentWhen(m)} · <SubmissionStatusBadge status={m.status} /> · earned{" "}
+            {formatTHB(m.net_paid)}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <a
+            href={m.video_url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+            title="Watch on YouTube"
+          >
+            YouTube <ExternalLink className="size-3" />
+          </a>
+          <Button asChild size="sm" variant="outline" className="h-7">
+            <Link href={`${routes.campaign(m.campaign_id)}?highlight=${m.submission_id}`}>
+              View in campaign <ArrowRight />
+            </Link>
+          </Button>
+        </div>
+      </div>
     </li>
   );
 }
