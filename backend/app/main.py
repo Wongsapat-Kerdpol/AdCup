@@ -12,6 +12,7 @@ from app.routers import (
     campaigns,
     outlook,
     payments,
+    platforms,
     review,
     settlement,
     submissions,
@@ -49,6 +50,7 @@ app.include_router(submissions.router)
 app.include_router(review.router)
 app.include_router(settlement.router)
 # Person 3
+app.include_router(platforms.router)
 app.include_router(youtube.router)
 app.include_router(payments.router)
 app.include_router(admin.router)

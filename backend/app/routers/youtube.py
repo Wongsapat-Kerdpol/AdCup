@@ -7,16 +7,13 @@
                                                save User.youtube_channel_id / _title / google_refresh_token
                                                (never returned to the frontend), then redirect to /settings
   POST /api/youtube/disconnect              — revoke the token at Google and clear those fields
-  POST /api/youtube/refresh/{submission_id} — creator (owner) or admin: services.youtube.refresh_views()
-                                               (creators: at most once per REFRESH_COOLDOWN)
-  POST /api/youtube/refresh-all             — admin: refresh every pending + approved submission,
-                                               then run one payout round (services/payout.py)
+  POST /api/youtube/refresh/{submission_id} — old path of POST /api/platforms/refresh/{submission_id}
+  POST /api/youtube/refresh-all             — old path of POST /api/platforms/refresh-all
 Config: settings.google_client_id / google_client_secret / google_redirect_uri
 Google Cloud: enable "YouTube Data API v3", OAuth consent screen in Testing mode, add the team's
 emails as test users (tokens of Testing-mode apps expire after 7 days — reconnect if needed).
 """
 
-import logging
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
@@ -30,20 +27,16 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import require_role
-from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
+from app.routers import platforms as platforms_router
 from app.schemas.user import UserPublic
 from app.schemas.youtube import ConnectResponse, RefreshAllResult, RefreshResult
 from app.services import youtube as yt
-from app.services.payout import settle_all
 
 router = APIRouter(prefix="/api/youtube", tags=["youtube (Person 3)"])
-log = logging.getLogger(__name__)
 
 _STATE_PURPOSE = "youtube_connect"
 _STATE_TTL = timedelta(minutes=10)
-# Stops a creator from spamming the button (each refresh costs YouTube API quota).
-REFRESH_COOLDOWN = timedelta(seconds=30)
 
 
 def _settings_redirect(result: str) -> RedirectResponse:
@@ -123,65 +116,18 @@ def disconnect(user: User = Depends(require_role(UserRole.creator)), db: Session
     return user
 
 
-@router.post("/refresh/{submission_id}", response_model=RefreshResult)
-def refresh_submission(
-    submission_id: int,
-    user: User = Depends(require_role(UserRole.creator, UserRole.admin)),
-    db: Session = Depends(get_db),
-):
-    submission = db.get(Submission, submission_id)
-    if submission is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
-    if user.role == UserRole.creator and submission.creator_id != user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your submission")
-    if submission.status == SubmissionStatus.rejected:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Rejected submissions are not refreshed")
-
-    last = submission.views_refreshed_at
-    if user.role == UserRole.creator and last and datetime.now(timezone.utc) - last < REFRESH_COOLDOWN:
-        return RefreshResult.model_validate(submission).model_copy(update={"throttled": True})
-
-    try:
-        info = yt.refresh_views(db, submission)
-    except (httpx.HTTPError, RuntimeError) as exc:
-        db.rollback()
-        log.warning("refresh of submission %s failed: %s", submission_id, exc)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not reach YouTube, try again later")
-
-    db.refresh(submission)
-    return RefreshResult.model_validate(submission).model_copy(update={"video_found": info is not None})
-
-
-@router.post("/refresh-all", response_model=RefreshAllResult)
-def refresh_all(_: User = Depends(require_role(UserRole.admin)), db: Session = Depends(get_db)):
-    """Refresh every pending + approved video, then run ONE payout round so every video is judged on
-    the same snapshot of views. One failure doesn't stop the batch."""
-    pending = db.scalars(
-        select(Submission).where(Submission.status == SubmissionStatus.pending).order_by(Submission.id)
-    ).all()
-    approved = db.scalars(
-        select(Submission)
-        .where(Submission.status == SubmissionStatus.approved)
-        .order_by(Submission.id)
-    ).all()
-
-    result = RefreshAllResult(total=len(pending) + len(approved), refreshed=0, video_missing=0, failed=0)
-    for submission in [*pending, *approved]:
-        try:
-            info = yt.refresh_views(db, submission)
-        except Exception as exc:  # keep going; one bad video or Person 2 error mustn't block the rest
-            db.rollback()
-            log.warning("refresh-all: submission %s failed: %s", submission.id, exc)
-            result.failed += 1
-            continue
-        result.refreshed += 1
-        if info is None:
-            result.video_missing += 1
-
-    try:
-        result.payouts = len(settle_all(db))
-        db.commit()
-    except Exception as exc:  # the views are already saved; the round can be re-run from /api/admin/payout-round
-        db.rollback()
-        log.warning("refresh-all: payout round failed: %s", exc)
-    return result
+# Old paths, kept so existing callers keep working; the logic lives in routers/platforms.py.
+router.add_api_route(
+    "/refresh/{submission_id}",
+    platforms_router.refresh_submission,
+    methods=["POST"],
+    response_model=RefreshResult,
+    include_in_schema=False,
+)
+router.add_api_route(
+    "/refresh-all",
+    platforms_router.refresh_all,
+    methods=["POST"],
+    response_model=RefreshAllResult,
+    include_in_schema=False,
+)

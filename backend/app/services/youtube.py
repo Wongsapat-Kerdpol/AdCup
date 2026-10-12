@@ -3,32 +3,22 @@
 Contract (keep these signatures so Person 2 can code against them now):
     extract_video_id(url) -> str | None           # done (Main)
     get_video_info(video_id) -> VideoInfo | None  # done (Person 3) — needs YOUTUBE_API_KEY in .env
-    refresh_views(db, submission) -> VideoInfo | None  # done (Person 3)
+    refresh_views(db, submission)                 # moved to services/platforms (this name still works)
 
 OAuth (done, Person 3) proves channel ownership: build_auth_url -> exchange_code -> get_my_channel.
-
-refresh_views stores the fresh stats on the submission, then:
-    - status pending  -> services.verification.run_system_check(db, submission)
-    - status approved -> nothing more: money is only paid in payout rounds (services.payout.settle_*),
-                         so refreshing earlier or more often gives no advantage.
-The system check is looked up at call time, so refresh works (views only) before it lands.
-Triggers: POST /api/youtube/refresh/{submission_id} and POST /api/youtube/refresh-all (routers/youtube.py).
+The system check and views refresh reach YouTube through services/platforms/youtube.py.
 """
 
-import importlib
-import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from urllib.parse import urlencode
 
 import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.submission import Submission, SubmissionStatus
-
-log = logging.getLogger(__name__)
+from app.models.submission import Submission
 
 _VIDEOS_URL = "https://www.googleapis.com/youtube/v3/videos"
 _CHANNELS_URL = "https://www.googleapis.com/youtube/v3/channels"
@@ -100,44 +90,14 @@ def get_video_info(video_id: str) -> VideoInfo | None:
     )
 
 
-# --- Views refresh (hand-off to Person 2) ---
+# --- Views refresh ---
 
 
-def _person2_step(module: str, name: str):
-    """Person 2's function if it exists yet, else None (logged once per call)."""
-    fn = getattr(importlib.import_module(f"app.services.{module}"), name, None)
-    if fn is None:
-        log.warning("services.%s.%s is not implemented yet (Person 2) — views refreshed only", module, name)
-    return fn
+def refresh_views(db: Session, submission: Submission):
+    """Kept for existing callers — the platform-agnostic version lives in services/platforms."""
+    from app.services.platforms import refresh_views as refresh  # platforms imports this module
 
-
-def refresh_views(db: Session, submission: Submission) -> VideoInfo | None:
-    """Pull fresh YouTube stats onto the submission, then run the next step of its lifecycle.
-
-    Returns the VideoInfo, or None when the video no longer exists / is private (the stored
-    stats are kept; for a pending submission the system check decides what that means).
-    Raises httpx.HTTPError / RuntimeError on API or config problems, without saving anything.
-    """
-    video_id = submission.external_video_id or extract_video_id(submission.video_url)
-    info = get_video_info(video_id) if video_id else None
-
-    submission.views_refreshed_at = datetime.now(timezone.utc)
-    if info is not None:
-        submission.external_video_id = info.video_id
-        submission.video_title = info.title[:300]
-        submission.video_channel_id = info.channel_id
-        submission.video_published_at = info.published_at
-        submission.view_count = info.view_count
-    db.flush()
-
-    step = None
-    if submission.status == SubmissionStatus.pending:
-        step = _person2_step("verification", "run_system_check")
-    if step is not None:
-        step(db, submission)
-
-    db.commit()
-    return info
+    return refresh(db, submission)
 
 
 # --- Google OAuth (channel ownership) ---
